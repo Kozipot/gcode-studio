@@ -152,6 +152,17 @@ details.scene-tools[open] summary::before{transform:rotate(90deg)}
 .badge{background:#15151a;border:1px solid #2c2c36;border-radius:6px;padding:4px 8px;font-size:11px;font-family:'Cascadia Mono',Consolas,monospace;color:#c4c4d0}
 .badge b{color:var(--accent2);font-weight:700}
 #preview{display:block;width:100%;height:auto;background:#0a0a0d;border:1px solid #26262f;border-radius:10px;margin-top:10px}
+#preview.hidden{display:none}
+#preview3d{display:none;width:100%;height:auto;background:#0a0a0d;border:1px solid #26262f;border-radius:10px;margin-top:10px;touch-action:none;cursor:grab}
+#preview3d.active{display:block}
+.preview-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.seg{display:flex;border:1px solid #3a3a46;border-radius:7px;overflow:hidden}
+.seg button{background:#22222a;border:0;color:#c5c5d2;padding:6px 11px;font-size:11px;font-weight:600;cursor:pointer}
+.seg button:hover{background:#30303a;color:#fff}
+.seg button.active{background:var(--accent);color:#1a0c05}
+.zscale-label{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:0;text-transform:none;color:var(--dim);margin:0;white-space:nowrap}
+.zscale-label input[type="range"]{width:100px;padding:0;accent-color:var(--accent);background:none;border:none}
+.legend .grad3d{width:22px;height:9px;border-radius:2px;background:linear-gradient(90deg,#ffd08a,#ff4d2e)}
 .preview-wrap{position:relative}
 .preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
 .preview-head h3{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim)}

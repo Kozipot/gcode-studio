@@ -971,7 +971,18 @@ G1 X#100 Y#101 F500</pre>
           <h2>👁 Предпросмотр</h2>
           <span class="sub" id="previewInfo">—</span>
         </div>
+        <div class="preview-controls">
+          <div class="seg" id="previewMode" role="group" aria-label="Режим предпросмотра">
+            <button type="button" data-view="2d" class="active">2D</button>
+            <button type="button" data-view="3d">3D</button>
+          </div>
+          <label class="zscale-label" for="zScale">Масштаб Z
+            <input id="zScale" type="range" min="1" max="10" step="0.5" value="3">
+          </label>
+          <button class="btn ghost small" id="viewReset">Сброс вида</button>
+        </div>
         <svg id="preview" viewBox="0 0 460 380" width="460" height="380"></svg>
+        <canvas id="preview3d" width="460" height="380" aria-label="Трёхмерный предпросмотр траекторий"></canvas>
         <div class="legend" id="legend"></div>
         <div class="stats" id="statsBox"></div>
       </section>

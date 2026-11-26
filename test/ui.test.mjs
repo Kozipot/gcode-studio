@@ -85,6 +85,19 @@ test('скачивание доступно', () => F('download').disabled === f
 test('статистика заполнена', () => qa('#statsBox .badge').length >= 5);
 test('превью нарисовано', () => qa('#preview line, #preview polyline, #preview rect').length > 3);
 test('легенда есть', () => qa('#legend span').length >= 1);
+test('3D: включается', () => {
+  click('#previewMode button[data-view="3d"]');
+  return q('#preview3d').classList.contains('active') && q('#preview').classList.contains('hidden');
+});
+test('3D: легенда с быстрым ходом', () => F('legend').textContent.includes('быстрый ход'));
+test('3D: масштаб Z по умолчанию', () => F('zScale').value === '3');
+setVal('zScale', '5');
+test('3D: масштаб Z меняется', () => F('zScale').value === '5');
+click('#viewReset');
+await sleep(100);
+test('3D: сброс вида', () => F('zScale').value === '3');
+click('#previewMode button[data-view="2d"]');
+test('2D: возвращается', () => !q('#preview3d').classList.contains('active') && !q('#preview').classList.contains('hidden'));
 const tips = qa('label .q');
 test('тултипы навешаны (40+)', () => tips.length > 40 || 'найдено ' + tips.length);
 const missing = qa('.panel input[id], .panel select[id], .panel textarea[id], .scene-card input, .scene-card select, .scene-card textarea')

@@ -117,7 +117,8 @@ var TIPS = {
   arcDir: 'G3 — против часовой стрелки, G2 — по часовой.',
   paramExpr: 'Выражение Macro B: #переменные, + − * / ^ MOD, функции SIN/COS/TAN/ATAN/ABS/SQRT/ROUND/FIX/FUP/LN/EXP, сравнения EQ/NE/GT/LT/GE/LE и логика AND/OR/XOR. Углы в градусах.',
   paramMode: 'Готовый параметрический шаблон: отверстия по окружности, сетка, рамка с проходами или окружность по точкам.',
-  paramView: 'Параметрическая версия содержит #переменные и WHILE для Fanuc/Haas/LinuxCNC. Числовая — готовые координаты, её можно проверить и скачать. GRBL макросы не поддерживает.'
+  paramView: 'Параметрическая версия содержит #переменные и WHILE для Fanuc/Haas/LinuxCNC. Числовая — готовые координаты, её можно проверить и скачать. GRBL макросы не поддерживает.',
+  zScale: 'Вертикальное преувеличение в 3D. 1× — реальные пропорции, 5–10× — лучше видно глубину резания. На саму программу не влияет.'
 };
 
 var tipbox = $('tipbox');
@@ -200,6 +201,11 @@ var state = {
   paramValues: {},
   paramView: 'param',
   paramResult: null,
+  preview3d: false,
+  zScale: 3,
+  cam3d: { yaw: -Math.PI / 4, pitch: Math.PI / 7, zoom: 1, panX: 0, panY: 0 },
+  scene3d: null,
+  lastPreview: { moves: [], options: {} },
   tools: [{no:1, name:'Фреза Ø3', d:3, flutes:2, s:12000, f:800, fz:200}]
 };
 
@@ -705,7 +711,7 @@ function arcPoints(prev, m, n){
   return pts;
 }
 
-function drawPreview(moves, options){
+function drawPreview2D(moves, options){
   var o = options || {};
   var svg = $('preview');
   svg.innerHTML = '';
@@ -874,6 +880,371 @@ function drawPreview(moves, options){
     zi.innerHTML = '<i class="zbar"></i><span class="nm" title="Разные высоты внутри одной программы">Z ' +
       esc(fmt(zHi, 2)) + '…' + esc(fmt(zLo, 2)) + '</span>';
     legend.appendChild(zi);
+  }
+}
+
+/* ---------------------------------------------------------------- 3D-предпросмотр */
+function drawPreview(moves, options){
+  state.lastPreview = { moves: moves || [], options: options || {} };
+  if (state.preview3d) drawPreview3D();
+  else drawPreview2D(moves, options);
+}
+
+function previewBlank(options){
+  var b = options && options.blank;
+  return (b && b.enabled && b.w > 0 && b.h > 0) ? b : null;
+}
+
+function build3DScene(moves, options){
+  var blank = previewBlank(options);
+  var b = { minX:Infinity, minY:Infinity, minZ:Infinity, maxX:-Infinity, maxY:-Infinity, maxZ:-Infinity };
+  function acc(x, y, z){
+    if (x < b.minX) b.minX = x;
+    if (x > b.maxX) b.maxX = x;
+    if (y < b.minY) b.minY = y;
+    if (y > b.maxY) b.maxY = y;
+    if (z < b.minZ) b.minZ = z;
+    if (z > b.maxZ) b.maxZ = z;
+  }
+  var segs = [], prev = null;
+  for (var i = 0; i < moves.length; i++){
+    var m = moves[i];
+    if (m.t === 'comment' || m.t === 'dwell' || m.t === 'toolchange') continue;
+    if (m.x === undefined) continue;
+    if (prev && m.t === 'arc'){
+      var ap = arcPoints(prev, m, 10);
+      for (var j = 1; j < ap.length; j++){
+        var t0 = (j - 1) / (ap.length - 1), t1 = j / (ap.length - 1);
+        var a = [ap[j-1][0], ap[j-1][1], prev.z + (m.z - prev.z) * t0];
+        var c = [ap[j][0], ap[j][1], prev.z + (m.z - prev.z) * t1];
+        segs.push({a:a, b:c, rapid:false, cut:true, plunge:false, z:(a[2] + c[2]) / 2,
+          zLo:Math.min(a[2], c[2]), zHi:Math.max(a[2], c[2])});
+        acc(a[0], a[1], a[2]); acc(c[0], c[1], c[2]);
+      }
+    } else if (prev && (m.t === 'line' || m.t === 'rapid')){
+      var a2 = [prev.x, prev.y, prev.z], b2 = [m.x, m.y, m.z];
+      var sameXY = Math.abs(a2[0] - b2[0]) < 1e-9 && Math.abs(a2[1] - b2[1]) < 1e-9;
+      var plunge = sameXY && Math.abs(a2[2] - b2[2]) > 1e-9;
+      segs.push({a:a2, b:b2, rapid:m.t === 'rapid', cut:(m.t !== 'rapid' && !plunge), plunge:plunge,
+        z:(a2[2] + b2[2]) / 2, zLo:Math.min(a2[2], b2[2]), zHi:Math.max(a2[2], b2[2])});
+      acc(a2[0], a2[1], a2[2]); acc(b2[0], b2[1], b2[2]);
+    }
+    prev = m;
+  }
+  if (blank){
+    var th = Math.max(0.5, numOr(blank.thickness, 5));
+    acc(0, 0, 0); acc(blank.w, 0, 0); acc(blank.w, blank.h, 0); acc(0, blank.h, 0);
+    acc(0, 0, -th); acc(blank.w, 0, -th); acc(blank.w, blank.h, -th); acc(0, blank.h, -th);
+  }
+  (options.holes || []).forEach(function(h){
+    acc(h.x, h.y, 0);
+    acc(h.x + h.d/2, h.y + h.d/2, 0);
+    acc(h.x - h.d/2, h.y - h.d/2, 0);
+  });
+  if (!isFinite(b.minX)){ b.minX = -20; b.maxX = 20; b.minY = -20; b.maxY = 20; b.minZ = -5; b.maxZ = 0; }
+  var mx = Math.max(0.5, (b.maxX - b.minX) * 0.04), my = Math.max(0.5, (b.maxY - b.minY) * 0.04);
+  b.minX -= mx; b.maxX += mx; b.minY -= my; b.maxY += my;
+  if (segs.length > 40000) segs = segs.filter(function(_, k){ return k % 2 === 0; });
+  return {segments:segs, bounds:b, blank:blank};
+}
+
+function project3D(p, view){
+  var x = p[0] - view.cx, y = p[1] - view.cy, z = (p[2] - view.cz) * view.zScale;
+  var cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+  var x1 = x * cy - y * sy, y1 = x * sy + y * cy;
+  var cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+  var y2 = y1 * cp + z * sp;
+  var depth = -y1 * sp + z * cp;
+  return [view.w / 2 + x1 * view.scale + view.panX, view.h / 2 - y2 * view.scale + view.panY, depth];
+}
+
+function cutColor3D(t){
+  t = clampNum(t, 0, 1);
+  var g = Math.round(208 + (77 - 208) * t);
+  var b = Math.round(138 + (46 - 138) * t);
+  return 'rgb(255,' + g + ',' + b + ')';
+}
+
+function size3DCanvas(canvas){
+  var w = Math.max(300, Math.round(canvas.clientWidth || 460));
+  var h = Math.max(260, Math.min(430, Math.round(w * 0.68)));
+  var dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1);
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)){
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  canvas.style.height = h + 'px';
+  var ctx = canvas.getContext ? canvas.getContext('2d') : null;
+  if (!ctx) return {w:w, h:h, ctx:null};
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {w:w, h:h, ctx:ctx};
+}
+
+function draw3DLegend(scene){
+  var legend = $('legend');
+  if (!legend) return;
+  var zMin = Infinity, zMax = -Infinity;
+  scene.segments.forEach(function(s){
+    if (s.cut){
+      if (s.zLo < zMin) zMin = s.zLo;
+      if (s.zHi > zMax) zMax = s.zHi;
+    }
+  });
+  var ztxt = isFinite(zMin) ? ('Z ' + fmt(zMax, 2) + '…' + fmt(zMin, 2)) : 'Z —';
+  legend.innerHTML =
+    '<span><i class="grad3d"></i><span class="nm">рез · ' + esc(ztxt) + '</span></span>' +
+    '<span><i style="background:#38bdf8"></i><span class="nm">быстрый ход</span></span>' +
+    '<span><span class="nm">ЛКМ — вращать · колесо — масштаб</span></span>';
+}
+
+function drawStock3D(ctx, scene, view, project){
+  var blank = scene.blank;
+  if (!blank) return;
+  var w = blank.w, h = blank.h, th = Math.max(0.5, numOr(blank.thickness, 5));
+  var top = [[0,0,0],[w,0,0],[w,h,0],[0,h,0]].map(project);
+  var bot = [[0,0,-th],[w,0,-th],[w,h,-th],[0,h,-th]].map(project);
+  function poly(pts, fill, stroke, dash, lw){
+    ctx.beginPath();
+    for (var i = 0; i < pts.length; i++){
+      if (i === 0) ctx.moveTo(pts[i][0], pts[i][1]);
+      else ctx.lineTo(pts[i][0], pts[i][1]);
+    }
+    ctx.closePath();
+    if (fill){ ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke){
+      ctx.setLineDash(dash || []);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = lw || 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  poly(bot, 'rgba(74,144,217,.03)', '#35506b', [4,4], 1);
+  poly(top, 'rgba(74,144,217,.07)', '#4a90d9', [6,4], 1.2);
+  ctx.strokeStyle = 'rgba(74,144,217,.35)';
+  ctx.lineWidth = 1;
+  for (var i = 0; i < 4; i++){
+    ctx.beginPath();
+    ctx.moveTo(top[i][0], top[i][1]);
+    ctx.lineTo(bot[i][0], bot[i][1]);
+    ctx.stroke();
+  }
+}
+
+function drawGrid3D(ctx, scene, view, project){
+  var b = scene.bounds;
+  var x0, y0, x1, y1, z;
+  if (scene.blank){ x0 = 0; y0 = 0; x1 = scene.blank.w; y1 = scene.blank.h; z = 0; }
+  else { x0 = b.minX; y0 = b.minY; x1 = b.maxX; y1 = b.maxY; z = 0; }
+  var span = Math.max(x1 - x0, y1 - y0);
+  var steps = [1,2,5,10,20,25,50,100,200,500];
+  var step = steps[steps.length-1];
+  for (var s = 0; s < steps.length; s++){ if (span / steps[s] <= 10){ step = steps[s]; break; } }
+  ctx.strokeStyle = 'rgba(100,100,125,.16)';
+  ctx.lineWidth = 1;
+  for (var gx = Math.ceil(x0/step)*step; gx <= x1 + 1e-9; gx += step){
+    var a = project([gx, y0, z]), c = project([gx, y1, z]);
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(c[0], c[1]); ctx.stroke();
+  }
+  for (var gy = Math.ceil(y0/step)*step; gy <= y1 + 1e-9; gy += step){
+    var d = project([x0, gy, z]), e = project([x1, gy, z]);
+    ctx.beginPath(); ctx.moveTo(d[0], d[1]); ctx.lineTo(e[0], e[1]); ctx.stroke();
+  }
+}
+
+function drawAxes3D(ctx, scene, project){
+  var b = scene.bounds;
+  var len = Math.max(8, Math.min(20, Math.max(b.maxX - b.minX, b.maxY - b.minY) * 0.18));
+  var o = project([0,0,0]);
+  var axes = [
+    [[len,0,0], '#ff8a65', 'X'],
+    [[0,len,0], '#81c784', 'Y'],
+    [[0,0,len], '#64b5f6', 'Z']
+  ];
+  ctx.lineWidth = 1.6;
+  axes.forEach(function(ax){
+    var p = project(ax[0]);
+    ctx.strokeStyle = ax[1];
+    ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(p[0], p[1]); ctx.stroke();
+    ctx.fillStyle = ax[1];
+    ctx.font = 'bold 11px system-ui';
+    ctx.fillText(ax[2], p[0] + 4, p[1] - 4);
+  });
+}
+
+function drawPreview3D(){
+  var canvas = $('preview3d');
+  if (!canvas) return;
+  var moves = (state.lastPreview && state.lastPreview.moves) || [];
+  var options = (state.lastPreview && state.lastPreview.options) || {};
+  var blank = previewBlank(options);
+  var key = blank ? (blank.w + 'x' + blank.h + 'x' + (blank.thickness || 5)) : 'none';
+  if (!state.scene3d || state.scene3d.moves !== moves || state.scene3d.blankKey !== key){
+    var sc = build3DScene(moves, options);
+    sc.moves = moves;
+    sc.blankKey = key;
+    state.scene3d = sc;
+  }
+  var scene = state.scene3d;
+  draw3DLegend(scene);
+  var sized = size3DCanvas(canvas);
+  var ctx = sized.ctx, w = sized.w, h = sized.h;
+  if (!ctx) return;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#0a0a0d';
+  ctx.fillRect(0, 0, w, h);
+  if (!moves.length && !scene.blank){
+    ctx.fillStyle = '#55555f';
+    ctx.font = '13px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Нет траекторий — сгенерируйте или импортируйте G-код', w/2, h/2);
+    ctx.textAlign = 'left';
+    return;
+  }
+  var b = scene.bounds;
+  var cam = state.cam3d;
+  var zScale = Math.max(1, numOr(state.zScale, 3));
+  var dx = b.maxX - b.minX, dy = b.maxY - b.minY, dz = (b.maxZ - b.minZ) * zScale;
+  var radius = Math.max(Math.hypot(dx, dy), dz) / 2 || 1;
+  var scale = Math.min(w, h) / (radius * 2.7) * cam.zoom;
+  var view = {
+    w:w, h:h, cx:(b.minX + b.maxX)/2, cy:(b.minY + b.maxY)/2, cz:(b.minZ + b.maxZ)/2,
+    yaw:cam.yaw, pitch:cam.pitch, zScale:zScale, scale:scale, panX:cam.panX, panY:cam.panY
+  };
+  function project(p){ return project3D(p, view); }
+  drawGrid3D(ctx, scene, view, project);
+  drawStock3D(ctx, scene, view, project);
+  var zMin = Infinity, zMax = -Infinity;
+  scene.segments.forEach(function(s){
+    if (s.cut){
+      if (s.zLo < zMin) zMin = s.zLo;
+      if (s.zHi > zMax) zMax = s.zHi;
+    }
+  });
+  var buckets = [], rapids = [], plunges = [];
+  for (var bi = 0; bi < 16; bi++) buckets.push([]);
+  scene.segments.forEach(function(s){
+    var p1 = project(s.a), p2 = project(s.b);
+    if (s.rapid) rapids.push([p1, p2]);
+    else if (s.plunge) plunges.push([p1, p2]);
+    else if (s.cut) {
+      var t = (zMax - zMin > 1e-9) ? (zMax - s.z) / (zMax - zMin) : 0;
+      buckets[Math.min(15, Math.max(0, Math.floor(t * 16)))].push([p1, p2]);
+    }
+  });
+  for (var k = 0; k < 16; k++){
+    if (!buckets[k].length) continue;
+    ctx.strokeStyle = cutColor3D(k / 15);
+    ctx.lineWidth = 1.35;
+    ctx.beginPath();
+    for (var q = 0; q < buckets[k].length; q++){
+      ctx.moveTo(buckets[k][q][0][0], buckets[k][q][0][1]);
+      ctx.lineTo(buckets[k][q][1][0], buckets[k][q][1][1]);
+    }
+    ctx.stroke();
+  }
+  if (plunges.length){
+    ctx.strokeStyle = 'rgba(150,150,170,.35)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    for (var pz = 0; pz < plunges.length; pz++){
+      ctx.moveTo(plunges[pz][0][0], plunges[pz][0][1]);
+      ctx.lineTo(plunges[pz][1][0], plunges[pz][1][1]);
+    }
+    ctx.stroke();
+  }
+  if (rapids.length){
+    ctx.strokeStyle = 'rgba(56,189,248,.72)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    for (var r = 0; r < rapids.length; r++){
+      ctx.moveTo(rapids[r][0][0], rapids[r][0][1]);
+      ctx.lineTo(rapids[r][1][0], rapids[r][1][1]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  drawAxes3D(ctx, scene, project);
+  ctx.fillStyle = 'rgba(160,160,180,.6)';
+  ctx.font = '10px system-ui';
+  ctx.fillText('3D · ЛКМ вращать · колесо масштаб · ПКМ панорама', 10, h - 10);
+}
+
+function setPreviewMode(mode){
+  state.preview3d = mode === '3d';
+  document.querySelectorAll('#previewMode button').forEach(function(b){
+    b.classList.toggle('active', b.dataset.view === mode);
+  });
+  var svg = $('preview'), cv = $('preview3d');
+  if (svg) svg.classList.toggle('hidden', state.preview3d);
+  if (cv) cv.classList.toggle('active', state.preview3d);
+  if (state.preview3d) drawPreview3D();
+  else if (state.lastPreview) drawPreview2D(state.lastPreview.moves, state.lastPreview.options);
+}
+
+function resetPreview3D(){
+  state.cam3d = { yaw:-Math.PI/4, pitch:Math.PI/7, zoom:1, panX:0, panY:0 };
+  state.zScale = 3;
+  var zs = $('zScale');
+  if (zs) zs.value = '3';
+  drawPreview3D();
+}
+
+function initPreview3D(){
+  var cv = $('preview3d');
+  if (!cv) return;
+  document.querySelectorAll('#previewMode button').forEach(function(btn){
+    btn.addEventListener('click', function(){ setPreviewMode(btn.dataset.view); });
+  });
+  var zs = $('zScale');
+  if (zs) zs.addEventListener('input', function(){
+    state.zScale = Math.max(1, numOr(zs.value, 3));
+    if (state.preview3d) drawPreview3D();
+  });
+  var reset = $('viewReset');
+  if (reset) reset.addEventListener('click', resetPreview3D);
+
+  var drag = null;
+  cv.addEventListener('pointerdown', function(e){
+    if (typeof cv.setPointerCapture === 'function') cv.setPointerCapture(e.pointerId);
+    drag = {x:e.clientX, y:e.clientY, button:e.button, shift:e.shiftKey};
+    cv.style.cursor = 'grabbing';
+  });
+  cv.addEventListener('pointermove', function(e){
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    drag.x = e.clientX; drag.y = e.clientY;
+    var pan = drag.button === 2 || drag.shift || e.shiftKey;
+    if (pan){
+      state.cam3d.panX += dx;
+      state.cam3d.panY += dy;
+    } else {
+      state.cam3d.yaw += dx * 0.01;
+      state.cam3d.pitch = clampNum(state.cam3d.pitch + dy * 0.01, 0.12, 1.42);
+    }
+    if (state.preview3d) drawPreview3D();
+  });
+  function endDrag(){
+    drag = null;
+    cv.style.cursor = 'grab';
+  }
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  cv.addEventListener('pointerleave', function(){ if (!drag) cv.style.cursor = 'grab'; });
+  cv.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  cv.addEventListener('wheel', function(e){
+    e.preventDefault();
+    state.cam3d.zoom = clampNum(state.cam3d.zoom * Math.exp(-e.deltaY * 0.001), 0.35, 4);
+    if (state.preview3d) drawPreview3D();
+  }, { passive:false });
+  if (typeof window.addEventListener === 'function'){
+    var rt = null;
+    window.addEventListener('resize', function(){
+      if (!state.preview3d) return;
+      clearTimeout(rt);
+      rt = setTimeout(drawPreview3D, 120);
+    });
   }
 }
 
@@ -1993,6 +2364,7 @@ function onMainInput(e){
 }
 
 function initCommonEvents(){
+  initPreview3D();
   MAIN_IDS.forEach(function(id){
     var el = $(id);
     if (!el) return;
