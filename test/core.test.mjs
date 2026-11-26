@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { loadCore } from './load-core.mjs';
 
 const C = loadCore();
@@ -234,6 +235,17 @@ test('дуги: I/J и отклонение конца', () => {
 test('импорт кода без M30 — ошибка в чек-листе', () => {
   const v = check('G21\nG90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\nM5\n');
   assert.equal(v.items.find(i => i.id === 'end').status, 'error');
+});
+test('макрос: #переменные и WHILE раскрываются для предпросмотра', () => {
+  const code = fs.readFileSync(new URL('./fixtures/macro-star.nc', import.meta.url), 'utf8');
+  const st = C.parseProgram(code);
+  assert.equal(st.macroExpanded, true);
+  assert.ok(st.moves.length > 50, 'движений: ' + st.moves.length);
+  assert.ok(Math.abs(st.minCutZ + 10) < 1e-6, 'minCutZ=' + st.minCutZ);
+  const est = C.estimateMoves(st.moves, 100, 100);
+  assert.ok(est.totalSec > 60, 'время: ' + est.totalSec);
+  const v = C.validateGcode(code, { minZ:-25, blank:{ enabled:false }, safeZ:5, toolD:3 });
+  assert.equal(v.errors, 0, JSON.stringify(v.items.filter(i => i.status === 'error')));
 });
 
 console.log('\n— Резьба / сверление / расточка —');

@@ -1690,9 +1690,123 @@ function emitProgram(moves, meta, options){
   return L.join('\n');
 }
 
+/* --------------------------- 8b. Раскрытие параметрических программ */
+/**
+ * Раскрывает простые макросы Macro B (#переменные, WHILE/DO/END)
+ * в обычный G-код, чтобы предпросмотр, время и валидатор работали
+ * и для параметрических программ.
+ */
+function expandMacros(text){
+  var src = String(text === null || text === undefined ? '' : text);
+  if (!/(^|\n)\s*#\d+\s*=|WHILE\s*\[/i.test(src)) return src;
+
+  function stripComments(line){
+    var out = '', depth = 0;
+    for (var i = 0; i < line.length; i++){
+      var ch = line.charAt(i);
+      if (ch === '(') depth++;
+      else if (ch === ')'){ if (depth > 0) depth--; }
+      else if (depth === 0) out += ch;
+    }
+    return out.trim();
+  }
+  function readBracket(s, start){
+    var depth = 0;
+    for (var i = start; i < s.length; i++){
+      if (s.charAt(i) === '[') depth++;
+      else if (s.charAt(i) === ']'){
+        depth--;
+        if (depth === 0) return {body: s.slice(start + 1, i), end: i};
+      }
+    }
+    throw new Error('Не закрыта скобка [ в строке: ' + s);
+  }
+  function parseWhile(line){
+    var m = /^WHILE\s*\[/i.exec(line);
+    if (!m) return null;
+    var br = readBracket(line, m[0].length - 1);
+    var dm = /^\s*DO\s*(\d+)/i.exec(line.slice(br.end + 1));
+    if (!dm) throw new Error('WHILE без DO: ' + line);
+    return {cond: br.body, endTag: dm[1]};
+  }
+  function findEnd(lines, start, limit){
+    var depth = 0;
+    for (var i = start + 1; i < limit; i++){
+      if (/^WHILE\s*\[/i.test(lines[i])) depth++;
+      else if (/^END\s*\d+/i.test(lines[i])){
+        if (depth === 0) return i;
+        depth--;
+      }
+    }
+    return -1;
+  }
+  function expandLine(line, vars){
+    var out = '';
+    for (var i = 0; i < line.length;){
+      if (line.charAt(i) === '['){
+        var br = readBracket(line, i);
+        var v = paramEval(br.body, vars).value;
+        out += fmt(v, 3);
+        i = br.end + 1;
+      } else {
+        out += line.charAt(i);
+        i++;
+      }
+    }
+    return out.replace(/#(\d+)/g, function(_, n){
+      var v = vars[Number(n)];
+      return v === undefined ? '0' : fmt(v, 3);
+    }).trim();
+  }
+
+  var lines = src.split('\n').map(stripComments);
+  var vars = {};
+  var guard = 0;
+  function runBlock(start, end){
+    var out = [];
+    var i = start;
+    while (i < end){
+      if (++guard > 200000) throw new Error('Слишком много итераций макроса.');
+      var line = lines[i];
+      if (!line){ i++; continue; }
+      var wh = parseWhile(line);
+      if (wh){
+        var endIdx = findEnd(lines, i, end);
+        if (endIdx < 0) throw new Error('Нет END для WHILE: ' + line);
+        var iter = 0;
+        while (iter++ < 10000 && paramEval(wh.cond, vars).value !== 0){
+          out = out.concat(runBlock(i + 1, endIdx));
+        }
+        i = endIdx + 1;
+        continue;
+      }
+      var asg = /^#(\d+)\s*=\s*(.+)$/.exec(line);
+      if (asg){
+        vars[Number(asg[1])] = paramEval(asg[2], vars).value;
+        i++;
+        continue;
+      }
+      if (/^(END|DO)\s*\d+/i.test(line)){ i++; continue; }
+      if (/^(IF|GOTO|N\d+)/i.test(line)){ i++; continue; }
+      var ex = expandLine(line, vars);
+      if (ex) out.push(ex);
+      i++;
+    }
+    return out;
+  }
+  try {
+    var outLines = runBlock(0, lines.length);
+    return outLines.join('\n');
+  } catch (e){
+    return src;
+  }
+}
+
 /* --------------------------- 9. Разбор G-кода */
 function parseProgram(text){
-  var rawLines = String(text || '').split('\n');
+  var original = String(text || '');
+  var expanded = expandMacros(original);
+  var rawLines = String(expanded).split('\n');
   var moves = [];
   var st = {
     abs: true, scale: 1,
@@ -1891,6 +2005,7 @@ function parseProgram(text){
     if (drop > st.maxPassDrop) st.maxPassDrop = drop;
   }
   st.moves = moves;
+  st.macroExpanded = expanded !== original;
   st.lastZ = cur.z;
   st.lastX = cur.x;
   st.lastY = cur.y;

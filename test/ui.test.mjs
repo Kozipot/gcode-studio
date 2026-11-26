@@ -206,6 +206,14 @@ test('импорт корректного кода: без ошибок', () => 
 test('импорт: код в поле', () => output().includes('G1 X30'));
 test('импорт: превью нарисовано', () => qa('#preview line, #preview polyline').length > 2);
 test('импорт: информация разобрана', () => F('importInfo').textContent.includes('Разобрано'));
+const macroCode = fs.readFileSync(path.join(ROOT, 'test/fixtures/macro-star.nc'), 'utf8');
+F('importCode').value = macroCode;
+click('#importBtn');
+await sleep(500);
+test('макрос: предпросмотр не пустой', () => qa('#preview line, #preview polyline').length > 3);
+test('макрос: время посчитано', () => F('statsBox').textContent.includes('мин') || F('statsBox').textContent);
+test('макрос: информация о раскрытии', () => F('importInfo').textContent.includes('раскрыта'));
+test('макрос: чек-лист чистый', () => errors() === 0 || 'ошибок ' + errors());
 
 console.log('\n— Гравировка и кириллица —');
 tab('engrave');

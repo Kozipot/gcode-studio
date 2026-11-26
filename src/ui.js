@@ -1533,6 +1533,7 @@ function importProgram(silent){
     'X ' + fmt(b.minX, 2) + '…' + fmt(b.maxX, 2) + ' · Y ' + fmt(b.minY, 2) + '…' + fmt(b.maxY, 2) +
     ' · мин. Z ' + fmt(st.minCutZ, 3) + ' мм<br>' +
     '⏱ ≈ ' + formatTime(pr.est.totalSec) + ' · строк ' + st.lineCount;
+  if (st.macroExpanded) html += '<br>🧩 Параметрическая программа раскрыта: #переменные и WHILE выполнены для предпросмотра.';
   if (st.cycleIssues.length) html += '<br>⚠ ' + esc(st.cycleIssues.slice(0,3).map(function(x){ return 'стр.' + x.line + ': ' + x.text; }).join('; '));
   if (st.arcIssues.length) html += '<br>❌ ' + esc(st.arcIssues.slice(0,3).map(function(x){ return 'стр.' + x.line + ': ' + x.text; }).join('; '));
   if (!silent) setImportInfo(pr.res.ok ? (pr.res.warnings ? 'warn' : 'ok') : 'err', html);
