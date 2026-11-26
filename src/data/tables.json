@@ -1,0 +1,35 @@
+{
+  "threads": [
+    {"size":"M1.6","d":1.6,"p":0.35,"tap":1.25,"clear":1.8},
+    {"size":"M2","d":2.0,"p":0.40,"tap":1.60,"clear":2.2},
+    {"size":"M2.5","d":2.5,"p":0.45,"tap":2.05,"clear":2.7},
+    {"size":"M3","d":3.0,"p":0.50,"tap":2.50,"clear":3.2},
+    {"size":"M4","d":4.0,"p":0.70,"tap":3.30,"clear":4.3},
+    {"size":"M5","d":5.0,"p":0.80,"tap":4.20,"clear":5.3},
+    {"size":"M6","d":6.0,"p":1.00,"tap":5.00,"clear":6.4},
+    {"size":"M8","d":8.0,"p":1.25,"tap":6.80,"clear":8.4},
+    {"size":"M10","d":10.0,"p":1.50,"tap":8.50,"clear":10.5},
+    {"size":"M12","d":12.0,"p":1.75,"tap":10.20,"clear":12.5},
+    {"size":"M14","d":14.0,"p":2.00,"tap":12.00,"clear":14.5},
+    {"size":"M16","d":16.0,"p":2.00,"tap":14.00,"clear":16.5},
+    {"size":"M18","d":18.0,"p":2.50,"tap":15.50,"clear":18.5},
+    {"size":"M20","d":20.0,"p":2.50,"tap":17.50,"clear":20.5},
+    {"size":"M24","d":24.0,"p":3.00,"tap":21.00,"clear":24.5},
+    {"size":"M6×0.75","d":6.0,"p":0.75,"tap":5.25,"clear":6.4},
+    {"size":"M8×1.0","d":8.0,"p":1.00,"tap":7.00,"clear":8.4},
+    {"size":"M10×1.25","d":10.0,"p":1.25,"tap":8.75,"clear":10.5},
+    {"size":"M12×1.25","d":12.0,"p":1.25,"tap":10.75,"clear":12.5},
+    {"size":"G1/8\"","d":9.73,"p":0.91,"tap":8.80,"clear":9.9},
+    {"size":"G1/4\"","d":13.16,"p":1.34,"tap":11.80,"clear":13.3}
+  ],
+  "materials": {
+    "aluminium": {"name":"Алюминий", "vc":250, "fz":0.020, "drillVc":70, "drillFz":0.030, "tapVc":15},
+    "steel":     {"name":"Сталь",    "vc":80,  "fz":0.008, "drillVc":25, "drillFz":0.018, "tapVc":8},
+    "brass":     {"name":"Латунь",   "vc":180, "fz":0.018, "drillVc":60, "drillFz":0.025, "tapVc":15},
+    "copper":    {"name":"Медь",     "vc":120, "fz":0.012, "drillVc":45, "drillFz":0.020, "tapVc":10},
+    "wood":      {"name":"Дерево",   "vc":400, "fz":0.060, "drillVc":100,"drillFz":0.060, "tapVc":20},
+    "mdf":       {"name":"МДФ",      "vc":350, "fz":0.050, "drillVc":90, "drillFz":0.050, "tapVc":18},
+    "acrylic":   {"name":"Акрил",    "vc":250, "fz":0.030, "drillVc":60, "drillFz":0.040, "tapVc":12},
+    "pvc":       {"name":"ПВХ",      "vc":300, "fz":0.035, "drillVc":70, "drillFz":0.045, "tapVc":14}
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "gcode-studio",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Универсальный офлайн-генератор G-кода (single-file HTML)",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/core.test.mjs",
+    "test:ui": "node test/ui.test.mjs",
+    "audit": "node test/audit.mjs",
+    "test:autosave": "node test/autosave.test.mjs",
+    "verify": "node test/core.test.mjs && node test/ui.test.mjs && node test/audit.mjs && node test/autosave.test.mjs",
+    "shots": "node test/make-tabshots.mjs"
+  },
+  "devDependencies": {
+    "htmlparser2": "^12.0.0",
+    "linkedom": "^0.18.15"
+  }
+}

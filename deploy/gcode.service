@@ -1,0 +1,13 @@
+[Unit]
+Description=G-CODE Studio static site
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/deploy/gcode
+ExecStart=/usr/bin/python3 -m http.server 8081 --bind 127.0.0.1 --protocol HTTP/1.1
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

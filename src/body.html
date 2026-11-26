@@ -1,0 +1,927 @@
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">⚙</div>
+      <div>
+        <h1>G-CODE STUDIO</h1>
+        <small>универсальный генератор · гравировка · фигуры · резьба</small>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="engrave">✍ Гравировка</button>
+      <button class="tab" data-tab="scene">⬡ Конструктор</button>
+      <button class="tab" data-tab="threads">🔩 Резьба / сверление</button>
+      <button class="tab" data-tab="import">📥 Импорт / проверка</button>
+      <button class="tab" data-tab="arc">🧭 Дуги G2/G3</button>
+      <button class="tab" data-tab="param">🧮 Параметры</button>
+      <button class="tab" data-tab="ref">📚 Шпаргалки</button>
+    </nav>
+  </header>
+
+  <div class="layout" id="layout">
+    <div class="col">
+      <section class="panel">
+
+        <!-- ==================== ГРАВИРОВКА ==================== -->
+        <div class="tabpane active" id="tab-engrave">
+          <div class="panel-head">
+            <h2><span class="em">✍</span> Гравировка текста</h2>
+            <span class="sub">латиница + кириллица</span>
+          </div>
+          <div class="fields">
+            <div class="field">
+              <label for="engrMode">Источник</label>
+              <select id="engrMode">
+                <option value="text">Текст / надпись</option>
+                <option value="calc">Число из выражения</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="engrKind">Тип гравировки</label>
+              <select id="engrKind">
+                <option value="normal">Обычная (штрихи)</option>
+                <option value="inverse">Обратная (фон вокруг букв)</option>
+              </select>
+            </div>
+          </div>
+          <div id="engrTextWrap" style="margin-top:9px">
+            <label for="engrText">Надпись</label>
+            <textarea id="engrText" style="height:74px" spellcheck="false">ПРИВЕТ, МИР!</textarea>
+          </div>
+          <div id="engrCalcWrap" style="display:none;margin-top:9px">
+            <label for="calcExpr">Математическое выражение</label>
+            <input id="calcExpr" value="123+456" autocomplete="off">
+            <div class="hint" id="calcResult">—</div>
+          </div>
+          <div class="fields" style="margin-top:9px">
+            <div class="field">
+              <label for="engrSize">Высота прописных, мм</label>
+              <input id="engrSize" type="number" value="10" min="1" step="0.5">
+            </div>
+            <div class="field">
+              <label for="engrAlign">Выравнивание</label>
+              <select id="engrAlign">
+                <option value="left">По левому краю</option>
+                <option value="center">По центру</option>
+                <option value="right">По правому краю</option>
+              </select>
+            </div>
+          </div>
+          <div class="note" id="engrNote">Введите текст — предпросмотр и G-код обновятся автоматически.</div>
+        </div>
+
+        <!-- ==================== КОНСТРУКТОР ==================== -->
+        <div class="tabpane" id="tab-scene">
+          <div class="panel-head">
+            <h2><span class="em">⬡</span> Конструктор заготовки</h2>
+            <div class="head-actions">
+              <button class="btn icon" id="undoBtn" title="Отменить (Ctrl+Z)" disabled>↶</button>
+              <button class="btn icon" id="redoBtn" title="Повторить (Ctrl+Y)" disabled>↷</button>
+              <span class="save-status" id="saveStatus">💾 автосохранение</span>
+            </div>
+          </div>
+          <div class="fields four">
+            <div class="field check">
+              <label for="blankEnabled"><input type="checkbox" id="blankEnabled" checked> Поле заготовки</label>
+            </div>
+            <div class="field">
+              <label for="blankW">Ширина поля, мм</label>
+              <input id="blankW" type="number" value="80" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="blankH">Высота поля, мм</label>
+              <input id="blankH" type="number" value="50" min="1" step="1">
+            </div>
+            <div class="field">
+              <label for="blankT">Толщина, мм</label>
+              <input id="blankT" type="number" value="5" min="0.1" step="0.5">
+            </div>
+          </div>
+          <label for="templateSel" style="margin-top:12px">Шаблон заготовки</label>
+          <div class="toolbar">
+            <select id="templateSel" style="flex:1;min-width:180px"></select>
+            <button class="btn ghost small" id="templateApply">Загрузить шаблон</button>
+          </div>
+          <label for="addType" style="margin-top:10px">Добавить элемент</label>
+          <div class="toolbar">
+            <select id="addType" style="flex:1;min-width:170px"></select>
+            <button class="btn small" id="addEl">+ Добавить фигуру</button>
+            <button class="btn ghost small" id="sceneClear">Очистить</button>
+          </div>
+          <details class="scene-tools" id="sceneTools">
+            <summary>Массив, зеркало и выравнивание</summary>
+            <div class="scene-tools-body">
+              <div class="fields four">
+                <div class="field"><label for="arrCols">Копий по X</label><input id="arrCols" type="number" value="2" min="1" max="20" step="1"></div>
+                <div class="field"><label for="arrRows">Копий по Y</label><input id="arrRows" type="number" value="2" min="1" max="20" step="1"></div>
+                <div class="field"><label for="arrDx">Шаг по X, мм</label><input id="arrDx" type="number" value="20" step="1"></div>
+                <div class="field"><label for="arrDy">Шаг по Y, мм</label><input id="arrDy" type="number" value="20" step="1"></div>
+              </div>
+              <div class="toolbar end">
+                <button class="btn small" id="arrApply">Размножить все элементы</button>
+              </div>
+              <div class="align-row">
+                <span class="hint">Выровнять все:</span>
+                <button class="btn icon" data-align="left" title="По левому краю">⇤</button>
+                <button class="btn icon" data-align="centerX" title="По центру X">↔</button>
+                <button class="btn icon" data-align="right" title="По правому краю">⇥</button>
+                <button class="btn icon" data-align="bottom" title="По низу">⇩</button>
+                <button class="btn icon" data-align="middleY" title="По центру Y">↕</button>
+                <button class="btn icon" data-align="top" title="По верху">⇧</button>
+              </div>
+              <p class="hint">Массив дублирует все элементы сцены с шагом. Зеркало — кнопки ↔/↕ в карточке элемента. Выравнивание — по полю заготовки.</p>
+            </div>
+          </details>
+          <div class="hint">Элементы обрабатываются по порядку списка. Общее поле заготовки задаёт границы и проверку выхода за поле. У каждой фигуры можно задать свою глубину и профиль высоты — блок «Высоты Z» в карточке.</div>
+          <div class="scene-list" id="sceneList" style="margin-top:12px"></div>
+          <div class="note" id="sceneNote">—</div>
+        </div>
+
+        <!-- ==================== РЕЗЬБА / СВЕРЛЕНИЕ ==================== -->
+        <div class="tabpane" id="tab-threads">
+          <div class="panel-head">
+            <h2><span class="em">🔩</span> Резьба, сверление, растачивание</h2>
+            <span class="sub">G84 · G83 · G76</span>
+          </div>
+          <div class="subtabs" id="threadTabs">
+            <button class="subtab active" data-sub="t84">G84 · резьба</button>
+            <button class="subtab" data-sub="t83">G83 · сверление</button>
+            <button class="subtab" data-sub="t76">G76 · растачивание</button>
+          </div>
+
+          <div class="subpane active" id="sub-t84">
+            <div class="fields">
+              <div class="field full">
+                <label for="t84Thread">Резьба по таблице</label>
+                <select id="t84Thread"></select>
+              </div>
+              <div class="field">
+                <label for="t84D">Номинальный Ø, мм</label>
+                <input id="t84D" type="number" value="6" min="0.5" step="0.1">
+              </div>
+              <div class="field">
+                <label for="t84P">Шаг P, мм</label>
+                <input id="t84P" type="number" value="1" min="0.05" step="0.05">
+              </div>
+              <div class="field">
+                <label for="t84Depth">Глубина резьбы, мм</label>
+                <input id="t84Depth" type="number" value="-10" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t84R">Плоскость R, мм</label>
+                <input id="t84R" type="number" value="2" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t84Mat">Материал</label>
+                <select id="t84Mat"></select>
+              </div>
+              <div class="field">
+                <label for="t84S">Обороты S</label>
+                <input id="t84S" type="number" value="500" step="10">
+              </div>
+              <div class="field">
+                <label for="t84Fmode">Подача F</label>
+                <select id="t84Fmode">
+                  <option value="min">мм/мин (G94) = P×S</option>
+                  <option value="rev">мм/об (G95) = P</option>
+                </select>
+              </div>
+              <div class="field check">
+                <label for="t84Auto"><input type="checkbox" id="t84Auto" checked> Авто S по материалу</label>
+              </div>
+              <div class="field check">
+                <label for="t84Rigid"><input type="checkbox" id="t84Rigid"> Жёсткая синхронизация (M29)</label>
+              </div>
+            </div>
+            <div class="toolbar end">
+              <button class="btn small" id="t84Calc">Рассчитать G84</button>
+              <button class="btn ghost small" id="t84Make">Сделать программой</button>
+            </div>
+            <div class="out-meta" id="t84Meta"></div>
+            <pre class="out" id="t84Out"></pre>
+            <div class="note" id="t84Info">Выберите резьбу — диаметр, шаг и сверло под резьбу подставятся автоматически.</div>
+          </div>
+
+          <div class="subpane" id="sub-t83">
+            <div class="fields">
+              <div class="field">
+                <label for="t83D">Ø сверла, мм</label>
+                <input id="t83D" type="number" value="5" min="0.2" step="0.1">
+              </div>
+              <div class="field">
+                <label for="t83Depth">Глубина, мм</label>
+                <input id="t83Depth" type="number" value="-12" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t83R">Плоскость R, мм</label>
+                <input id="t83R" type="number" value="2" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t83Q">Peck Q, мм</label>
+                <input id="t83Q" type="number" value="3" min="0.1" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t83Cycle">Цикл</label>
+                <select id="t83Cycle">
+                  <option value="G83">G83 — с полным выводом</option>
+                  <option value="G73">G73 — высокоскоростной</option>
+                  <option value="G81">G81 — обычное сверление</option>
+                  <option value="G82">G82 — с паузой</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="t83P">Пауза P, с</label>
+                <input id="t83P" type="number" value="0.5" min="0" step="0.1">
+              </div>
+              <div class="field">
+                <label for="t83Mat">Материал</label>
+                <select id="t83Mat"></select>
+              </div>
+              <div class="field">
+                <label for="t83S">Обороты S</label>
+                <input id="t83S" type="number" value="1500" step="50">
+              </div>
+              <div class="field">
+                <label for="t83F">Подача F, мм/мин</label>
+                <input id="t83F" type="number" value="150" step="10">
+              </div>
+              <div class="field check">
+                <label for="t83Auto"><input type="checkbox" id="t83Auto" checked> Авто S/F по материалу</label>
+              </div>
+            </div>
+            <div class="toolbar end">
+              <button class="btn small" id="t83Calc">Рассчитать G83</button>
+              <button class="btn ghost small" id="t83Make">Сделать программой</button>
+            </div>
+            <div class="out-meta" id="t83Meta"></div>
+            <pre class="out" id="t83Out"></pre>
+            <div class="note" id="t83Info">Peck Q — глубина одного захода. Для стали обычно 0,5–1 Ø, для алюминия до 2 Ø.</div>
+          </div>
+
+          <div class="subpane" id="sub-t76">
+            <div class="fields">
+              <div class="field">
+                <label for="t76D">Ø расточки, мм</label>
+                <input id="t76D" type="number" value="20" min="1" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t76Depth">Глубина, мм</label>
+                <input id="t76Depth" type="number" value="-20" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t76R">Плоскость R, мм</label>
+                <input id="t76R" type="number" value="2" step="0.5">
+              </div>
+              <div class="field">
+                <label for="t76Q">Смещение Q, мм</label>
+                <input id="t76Q" type="number" value="0.2" min="0.01" step="0.05">
+              </div>
+              <div class="field">
+                <label for="t76P">Пауза P</label>
+                <input id="t76P" type="number" value="0.5" min="0" step="0.1">
+              </div>
+              <div class="field">
+                <label for="t76S">Обороты S</label>
+                <input id="t76S" type="number" value="600" step="50">
+              </div>
+              <div class="field">
+                <label for="t76F">Подача F, мм/мин</label>
+                <input id="t76F" type="number" value="48" step="5">
+              </div>
+            </div>
+            <div class="toolbar end">
+              <button class="btn small" id="t76Calc">Рассчитать G76</button>
+              <button class="btn ghost small" id="t76Make">Сделать программой</button>
+            </div>
+            <div class="out-meta" id="t76Meta"></div>
+            <pre class="out" id="t76Out"></pre>
+            <div class="note" id="t76Info">G76 — тонкое растачивание резцом: Q — смещение резца на дне, P — пауза для «выхаживания».</div>
+          </div>
+
+          <hr class="divider">
+          <div class="panel-head" style="margin-bottom:6px"><h2 style="font-size:13px">📍 Отверстия</h2><span class="sub">сетка или одно отверстие</span></div>
+          <div class="fields three">
+            <div class="field"><label for="hRows">Рядов</label><input id="hRows" type="number" value="1" min="1" step="1"></div>
+            <div class="field"><label for="hCols">Колонок</label><input id="hCols" type="number" value="1" min="1" step="1"></div>
+            <div class="field"><label for="hDx">Шаг по X, мм</label><input id="hDx" type="number" value="20" step="1"></div>
+            <div class="field"><label for="hDy">Шаг по Y, мм</label><input id="hDy" type="number" value="15" step="1"></div>
+            <div class="field"><label for="hX0">X первого, мм</label><input id="hX0" type="number" value="10" step="1"></div>
+            <div class="field"><label for="hY0">Y первого, мм</label><input id="hY0" type="number" value="10" step="1"></div>
+          </div>
+          <div class="hint">1×1 — одно отверстие в точке X/Y. Для сетки последующие отверстия добавляются шагом dx/dy.</div>
+        </div>
+
+        <!-- ==================== ИМПОРТ ==================== -->
+        <div class="tabpane" id="tab-import">
+          <div class="panel-head">
+            <h2><span class="em">📥</span> Импорт и проверка G-кода</h2>
+            <span class="sub">разбор · предпросмотр · валидатор</span>
+          </div>
+          <label for="importCode">Вставьте G-код</label>
+          <textarea id="importCode" style="height:200px" spellcheck="false" placeholder="G21 G90&#10;G0 X0 Y0 Z5&#10;G1 Z-1 F200&#10;G1 X30 F500&#10;...">G21 G90 G17
+M3 S12000
+G0 X0 Y0 Z5
+G1 Z-1 F200
+G1 X40 F600
+G1 Y25
+G1 X0
+G1 Y0
+G0 Z5
+M5
+M30</textarea>
+          <div class="toolbar end">
+            <button class="btn" id="importBtn">Проверить и показать</button>
+            <button class="btn ghost" id="importClear">Очистить</button>
+          </div>
+          <div class="note" id="importInfo">Вставьте код и нажмите «Проверить»: программа разберётся, отрисуется и пройдёт чек-лист.</div>
+        </div>
+
+        <!-- ==================== ДУГИ ==================== -->
+        <div class="tabpane" id="tab-arc">
+          <div class="panel-head">
+            <h2><span class="em">🧭</span> Калькулятор дуг G2 / G3</h2>
+            <span class="sub">центр · I/J · R · длина · угол</span>
+          </div>
+          <div class="fields">
+            <div class="field"><label for="arcSx">Начало X, мм</label><input id="arcSx" type="number" value="10" step="0.1"></div>
+            <div class="field"><label for="arcSy">Начало Y, мм</label><input id="arcSy" type="number" value="0" step="0.1"></div>
+            <div class="field"><label for="arcEx">Конец X, мм</label><input id="arcEx" type="number" value="0" step="0.1"></div>
+            <div class="field"><label for="arcEy">Конец Y, мм</label><input id="arcEy" type="number" value="10" step="0.1"></div>
+            <div class="field"><label for="arcR">Радиус R (пусто = авто)</label><input id="arcR" type="number" value="" step="0.1" placeholder="хорда/2"></div>
+            <div class="field"><label for="arcDir">Направление</label>
+              <select id="arcDir"><option value="G3">G3 · против часовой ↺</option><option value="G2">G2 · по часовой ↻</option></select>
+            </div>
+          </div>
+          <div class="toolbar end">
+            <button class="btn" id="arcSolve">Рассчитать дугу</button>
+            <button class="btn ghost" id="arcInsert">Вставить в программу</button>
+            <button class="btn ghost" id="arcReset">Сбросить</button>
+          </div>
+          <pre class="out" id="arcOut">— введите параметры —</pre>
+          <div class="preview-head"><h3>Предпросмотр дуги</h3><span class="sub" id="arcInfo">—</span></div>
+          <svg id="arcPreview" viewBox="0 0 440 300" width="440" height="300" style="width:100%;height:auto;background:#0a0a0d;border-radius:8px;margin-top:8px"></svg>
+          <div class="note" id="arcNote">R — радиус дуги. Пусто — половина хорды (полуокружность). Для дуги больше 180° в некоторых контроллерах R задаётся отрицательным; надёжнее формат I/J. Кнопка «Вставить в программу» добавляет рассчитанную дугу в текущую программу справа (перед M30).</div>
+        </div>
+
+        <!-- ==================== ПАРАМЕТРИКА ==================== -->
+        <div class="tabpane" id="tab-param">
+          <div class="panel-head">
+            <h2><span class="em">🧮</span> Параметрический калькулятор</h2>
+            <span class="sub">выражения · #переменные · циклы · G65</span>
+          </div>
+          <div class="param-grid">
+            <section class="param-card">
+              <h3>1. Переменные</h3>
+              <div class="pv-head"><span>#</span><span>Имя</span><span>Значение / выражение</span><span>Итог</span><span></span></div>
+              <div class="pv-list" id="paramVarList"></div>
+              <div class="toolbar end">
+                <button class="btn ghost small" id="paramVarAdd">+ Переменная</button>
+              </div>
+              <p class="hint">Значения считаются сверху вниз: переменная может ссылаться на предыдущие. Поддерживаются <code>#100</code>, <code>SIN[30]</code>, <code>SQRT[#100]</code>, <code>MOD</code> и сравнения.</p>
+            </section>
+
+            <section class="param-card">
+              <h3>2. Выражение</h3>
+              <label for="paramExpr">Выражение Macro B <i class="q" data-tip-text="Введите выражение с #переменными и функциями: SIN, COS, ATAN, SQRT, ABS, ROUND, MOD, сравнения EQ/GT/LT и логика AND/OR/XOR. Углы в градусах.">?</i></label>
+              <input id="paramExpr" value="[#100 * 2 + SIN[30]]" autocomplete="off" spellcheck="false">
+              <div class="param-expr-out" id="paramExprOut">—</div>
+              <div class="hint" id="paramExprNote">Результат можно использовать как координату или записать в переменную.</div>
+
+              <h3 style="margin-top:14px">3. Генератор</h3>
+              <div class="fields">
+                <div class="field">
+                  <label for="paramMode">Шаблон <i class="q" data-tip-text="Готовый параметрический шаблон: отверстия по окружности, сетка, рамка или окружность по точкам. Поля ниже зависят от шаблона.">?</i></label>
+                  <select id="paramMode"></select>
+                </div>
+                <div class="field">
+                  <label for="paramView">Версия кода <i class="q" data-tip-text="Параметрическая — с #переменными и WHILE для Macro B. Числовая — с уже посчитанными координатами, её можно проверить чек-листом и скачать.">?</i></label>
+                  <select id="paramView">
+                    <option value="param">Параметрическая (#, WHILE)</option>
+                    <option value="numeric">Числовая (готовые координаты)</option>
+                  </select>
+                </div>
+              </div>
+              <div class="param-fields" id="paramFields"></div>
+              <div class="toolbar end">
+                <button class="btn" id="paramCalc">Рассчитать</button>
+                <button class="btn ghost" id="paramMake">В программу (числа)</button>
+                <button class="btn ghost" id="paramCopy">Копировать</button>
+              </div>
+              <pre class="out" id="paramOut">— нажмите «Рассчитать» —</pre>
+              <div class="note" id="paramInfo">Выберите шаблон, задайте параметры и нажмите «Рассчитать».</div>
+            </section>
+          </div>
+
+          <section class="param-card span2">
+            <h3>Шпаргалка по параметрике</h3>
+            <div class="formula-cols">
+              <div>
+                <h4>Переменные и выражения</h4>
+                <ul>
+                  <li><code>#100 = 40</code> — присваивание</li>
+                  <li><code>#101 = #100 * 2 + 5</code> — арифметика</li>
+                  <li><code>#[#100]</code> — косвенная адресация</li>
+                  <li><code>SIN[30]</code>, <code>COS[#2]</code> — углы в градусах</li>
+                  <li><code>ATAN[#1]/[#2]</code> — угол с квадрантом</li>
+                  <li><code>MOD</code>, <code>ROUND</code>, <code>FIX</code>, <code>FUP</code></li>
+                </ul>
+              </div>
+              <div>
+                <h4>Циклы и вызовы</h4>
+                <ul>
+                  <li><code>WHILE [#1 LT 10] DO 1 … END 1</code></li>
+                  <li><code>IF [#1 EQ 0] GOTO 100</code></li>
+                  <li><code>G65 P9010 A40 B25</code> — вызов макроса</li>
+                  <li><code>#1…#33</code> — аргументы A…Z</li>
+                  <li><code>#100…#199</code> — общие переменные</li>
+                  <li>GRBL макросы не поддерживает — используйте числовую версию.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ==================== ШПАРГАЛКИ ==================== -->
+        <div class="tabpane" id="tab-ref">
+          <div class="panel-head">
+            <h2><span class="em">📚</span> Шпаргалки</h2>
+            <span class="sub">параметрическое программирование · G-коды · режимы</span>
+          </div>
+
+          <nav class="chip-nav">
+            <a class="chip" href="#ref-struct">Структура</a>
+            <a class="chip" href="#ref-vars">Переменные</a>
+            <a class="chip" href="#ref-math">Функции</a>
+            <a class="chip" href="#ref-logic">Сравнения</a>
+            <a class="chip" href="#ref-flow">Циклы</a>
+            <a class="chip" href="#ref-g65">G65</a>
+            <a class="chip" href="#ref-sys">Системные</a>
+            <a class="chip" href="#ref-examples">Примеры</a>
+            <a class="chip" href="#ref-codes">G- и M-коды</a>
+            <a class="chip" href="#ref-threads">Резьбы</a>
+            <a class="chip" href="#ref-formulas">Формулы</a>
+          </nav>
+
+          <div class="ref-grid">
+            <section class="ref-card span2" id="ref-struct">
+              <h3>Структура программы</h3>
+              <div class="prog-struct">
+                <div class="prow"><code>%</code><span class="pcm">; начало файла</span></div>
+                <div class="prow"><code>O0001</code><span class="pcm">; номер программы</span></div>
+                <div class="prow"><code>(комментарий)</code><span class="pcm">; в скобках</span></div>
+                <div class="prow"><code>G21 G90 G17 G94</code><span class="pcm">; мм, абсолют, XY, мм/мин</span></div>
+                <div class="prow"><code>M3 S12000</code><span class="pcm">; шпиндель</span></div>
+                <div class="prow"><code>G0 X0 Y0 Z5</code><span class="pcm">; безопасная позиция</span></div>
+                <div class="prow"><code>... рабочая часть ...</code><span class="pcm">; траектории и циклы</span></div>
+                <div class="prow"><code>M5</code><span class="pcm">; стоп шпинделя</span></div>
+                <div class="prow"><code>G0 Z5</code><span class="pcm">; подъём</span></div>
+                <div class="prow"><code>G0 X0 Y0</code><span class="pcm">; возврат</span></div>
+                <div class="prow"><code>M30</code><span class="pcm">; конец программы</span></div>
+                <div class="prow"><code>%</code><span class="pcm">; конец файла</span></div>
+              </div>
+              <p class="hint">% и O-номер — для Fanuc/LinuxCNC; Mach3 понимает %; GRBL работает без них. Комментарии — в скобках: <code>(чистовая)</code>. Точка с запятой в кадре допустима не на всех стойках, поэтому генератор использует скобки.</p>
+            </section>
+
+            <section class="ref-card" id="ref-vars">
+              <h3>Переменные</h3>
+              <table class="ref">
+                <tr><th>Запись</th><th>Что это</th><th>Когда использовать</th></tr>
+                <tr><td>#0</td><td>Пустая (null)</td><td>Проверка «не задано»: <code>IF [#1 EQ #0]</code></td></tr>
+                <tr><td>#1…#33</td><td>Локальные</td><td>Аргументы G65 и вычисления внутри макроса</td></tr>
+                <tr><td>#100…#199</td><td>Общие</td><td>Счётчики, координаты, флаги; сбрасываются при выключении</td></tr>
+                <tr><td>#500…#999</td><td>Энергонезависимые</td><td>Поправки и смещения, сохраняются после выключения</td></tr>
+                <tr><td>#1000+</td><td>Системные</td><td>Позиции осей, таймеры, авария — см. ниже</td></tr>
+                <tr><td>#[#100]</td><td>Косвенная адресация</td><td>Номер переменной вычисляется другой переменной</td></tr>
+              </table>
+              <pre>#100 = 5
+#101 = #100 + 10        (15)
+#[#100] = 42            (пишет в #5)
+G1 X#100 Y#101 F600     (X5 Y15)</pre>
+              <p class="hint">Переменные — вещественные числа. Деление на ноль и корень из отрицательного дают аварию стойки.</p>
+            </section>
+
+            <section class="ref-card" id="ref-math">
+              <h3>Арифметика и функции</h3>
+              <p><code>+ − * /</code> и <code>MOD</code> (остаток). Скобки задают порядок действий, функции имеют приоритет.</p>
+              <pre>#1 = 17 MOD 5           (2)
+#2 = (10 + 2) * 3       (36)
+#3 = #2 / 4             (9)</pre>
+              <table class="ref">
+                <tr><th>Функция</th><th>Синтаксис</th><th>Результат</th><th>Пример</th></tr>
+                <tr><td>SIN</td><td><code>SIN[#1]</code></td><td>Синус, угол в градусах</td><td>SIN[30] = 0.5</td></tr>
+                <tr><td>COS</td><td><code>COS[#1]</code></td><td>Косинус</td><td>COS[60] = 0.5</td></tr>
+                <tr><td>TAN</td><td><code>TAN[#1]</code></td><td>Тангенс</td><td>TAN[45] = 1</td></tr>
+                <tr><td>ASIN</td><td><code>ASIN[#1]</code></td><td>Угол по синусу, градусы</td><td>ASIN[0.5] = 30</td></tr>
+                <tr><td>ACOS</td><td><code>ACOS[#1]</code></td><td>Угол по косинусу</td><td>ACOS[0.5] = 60</td></tr>
+                <tr><td>ATAN</td><td><code>ATAN[#1]/[#2]</code></td><td>Угол по Y/X с квадрантом</td><td>ATAN[1]/[1] = 45</td></tr>
+                <tr><td>ABS</td><td><code>ABS[#1]</code></td><td>Модуль</td><td>ABS[-5] = 5</td></tr>
+                <tr><td>SQRT</td><td><code>SQRT[#1]</code></td><td>Квадратный корень</td><td>SQRT[25] = 5</td></tr>
+                <tr><td>ROUND</td><td><code>ROUND[#1]</code></td><td>Округление до целого</td><td>ROUND[2.6] = 3</td></tr>
+                <tr><td>FIX</td><td><code>FIX[#1]</code></td><td>Отбрасывание дробной части</td><td>FIX[-2.7] = -2</td></tr>
+                <tr><td>FUP</td><td><code>FUP[#1]</code></td><td>Округление вверх</td><td>FUP[2.1] = 3</td></tr>
+                <tr><td>LN</td><td><code>LN[#1]</code></td><td>Натуральный логарифм</td><td>LN[2.718] ≈ 1</td></tr>
+                <tr><td>EXP</td><td><code>EXP[#1]</code></td><td>e в степени</td><td>EXP[1] ≈ 2.718</td></tr>
+              </table>
+              <p class="hint">Аргумент функции обязательно в квадратных скобках: <code>SIN[#1]</code>, а не <code>SIN#1</code>. Углы — в градусах (Fanuc, Haas, LinuxCNC).</p>
+            </section>
+
+            <section class="ref-card" id="ref-logic">
+              <h3>Сравнения и логика</h3>
+              <table class="ref">
+                <tr><th>Оператор</th><th>Смысл</th><th>Пример</th></tr>
+                <tr><td>EQ</td><td>равно (=)</td><td><code>[#1 EQ 0]</code></td></tr>
+                <tr><td>NE</td><td>не равно (≠)</td><td><code>[#1 NE #2]</code></td></tr>
+                <tr><td>GT</td><td>больше (&gt;)</td><td><code>[#1 GT 10]</code></td></tr>
+                <tr><td>LT</td><td>меньше (&lt;)</td><td><code>[#1 LT 10]</code></td></tr>
+                <tr><td>GE</td><td>больше или равно (≥)</td><td><code>[#1 GE 0]</code></td></tr>
+                <tr><td>LE</td><td>меньше или равно (≤)</td><td><code>[#1 LE 5]</code></td></tr>
+                <tr><td>AND</td><td>логическое И</td><td><code>[#1 GT 0 AND #1 LT 10]</code></td></tr>
+                <tr><td>OR</td><td>логическое ИЛИ</td><td><code>[#1 EQ 0 OR #2 EQ 0]</code></td></tr>
+                <tr><td>XOR</td><td>исключающее ИЛИ</td><td><code>[#1 XOR #2]</code></td></tr>
+              </table>
+              <p>Отдельного NOT нет: «не равно нулю» записывают как <code>[#1 NE 0]</code>. Условие всегда в квадратных скобках.</p>
+            </section>
+
+            <section class="ref-card" id="ref-flow">
+              <h3>Переходы и циклы</h3>
+              <h4>Условный переход</h4>
+              <pre>IF [#100 LT 0] GOTO 200
+IF [#1 EQ 0] GOTO 900
+GOTO 300
+N100 (продолжение)
+N200 (аварийный выход)</pre>
+              <h4>Цикл WHILE</h4>
+              <pre>#1 = 0
+WHILE [#1 LT 10] DO 1
+  G1 X[#1 * 10] F500
+  #1 = #1 + 1
+END 1</pre>
+              <p>Метки: <code>N100</code>. Циклы <code>DO 1…3</code> / <code>END 1…3</code>, вложенность до 3 уровней. Счётчик обязательно менять внутри цикла, иначе бесконечный цикл. <code>GOTO</code> внутрь цикла запрещён.</p>
+            </section>
+
+            <section class="ref-card" id="ref-g65">
+              <h3>Вызов макроса G65</h3>
+              <p><code>G65 P9010 A10 B20 C5</code> — вызов программы <code>O9010</code> с аргументами. Аргументы раскладываются по локальным переменным:</p>
+              <table class="ref">
+                <tr><th>Арг.</th><th>Перем.</th><th>Арг.</th><th>Перем.</th></tr>
+                <tr><td>A</td><td>#1</td><td>N</td><td>#14</td></tr>
+                <tr><td>B</td><td>#2</td><td>O</td><td>#15</td></tr>
+                <tr><td>C</td><td>#3</td><td>P</td><td>#16</td></tr>
+                <tr><td>D</td><td>#7</td><td>Q</td><td>#17</td></tr>
+                <tr><td>E</td><td>#8</td><td>R</td><td>#18</td></tr>
+                <tr><td>F</td><td>#9</td><td>S</td><td>#19</td></tr>
+                <tr><td>G</td><td>#10</td><td>T</td><td>#20</td></tr>
+                <tr><td>H</td><td>#11</td><td>U</td><td>#21</td></tr>
+                <tr><td>I</td><td>#4</td><td>V</td><td>#22</td></tr>
+                <tr><td>J</td><td>#5</td><td>W</td><td>#23</td></tr>
+                <tr><td>K</td><td>#6</td><td>X</td><td>#24</td></tr>
+                <tr><td>L</td><td>#12</td><td>Y</td><td>#25</td></tr>
+                <tr><td>M</td><td>#13</td><td>Z</td><td>#26</td></tr>
+              </table>
+              <pre>G65 P9010 A40 B25 C2
+...
+O9010 (КАРМАН)
+( A=#1 ширина, B=#2 высота, C=#3 радиус )
+#10 = #1 / 2
+#11 = #2 / 2
+...
+M99</pre>
+              <p class="hint">G66 — модальный вызов макроса (действует до G67). Локальные #1…#33 общие для вложенных вызовов, поэтому сохраняйте нужные значения в #100…#199.</p>
+            </section>
+
+            <section class="ref-card" id="ref-sys">
+              <h3>Системные переменные</h3>
+              <table class="ref">
+                <tr><th>Переменная</th><th>Значение</th></tr>
+                <tr><td>#3000</td><td>Авария с сообщением: <code>#3000=1(НЕТ ЗАГОТОВКИ)</code></td></tr>
+                <tr><td>#3001</td><td>Таймер, миллисекунды</td></tr>
+                <tr><td>#3002</td><td>Таймер, часы</td></tr>
+                <tr><td>#3011</td><td>Дата, YYYYMMDD</td></tr>
+                <tr><td>#3012</td><td>Время, HHMMSS</td></tr>
+                <tr><td>#5001…#5005</td><td>Позиция конца кадра по X,Y,Z,A,B (рабочая СК)</td></tr>
+                <tr><td>#5021…#5025</td><td>Текущая машинная позиция</td></tr>
+                <tr><td>#5041…#5045</td><td>Текущая позиция в рабочей СК</td></tr>
+              </table>
+              <p class="hint">Набор и смысл системных переменных зависит от стойки: сверьтесь с руководством Fanuc/Haas. Часть из них только для чтения.</p>
+            </section>
+
+            <section class="ref-card span2" id="ref-examples">
+              <h3>Примеры параметрических программ</h3>
+              <div class="ex-grid">
+                <div>
+                  <h4>1. Сетка отверстий</h4>
+                  <pre>O0001 (ПЛИТА 4x3)
+G21 G90 G17
+T1 M6
+S2000 M3
+G0 X0 Y0 Z5
+G81 Z-6 R2 F150
+#1 = 0                    (ряд)
+WHILE [#1 LT 4] DO 1
+  #2 = 0                  (колонка)
+  WHILE [#2 LT 3] DO 2
+    X[#2 * 20] Y[#1 * 15]
+    #2 = #2 + 1
+  END 2
+  #1 = #1 + 1
+END 1
+G80
+M5
+M30</pre>
+                </div>
+                <div>
+                  <h4>2. Окружность фрезой</h4>
+                  <pre>O0002 (ОКРУЖНОСТЬ)
+G21 G90
+#1 = 25         (радиус)
+#2 = 72         (точек)
+#3 = 0          (угол)
+#4 = 0          (счётчик)
+G0 X#1 Y0 Z5
+G1 Z-2 F200
+WHILE [#4 LT #2] DO 1
+  #3 = #3 + 360 / #2
+  G1 X[#1 * COS[#3]] Y[#1 * SIN[#3]] F600
+  #4 = #4 + 1
+END 1
+G0 Z5
+M30</pre>
+                </div>
+                <div>
+                  <h4>3. Болтовое отверстие</h4>
+                  <pre>O0003 (6 ОТВЕРСТИЙ)
+G21 G90 G17
+#1 = 40         (радиус)
+#2 = 6          (отверстий)
+#3 = 0
+S1500 M3
+G81 Z-8 R2 F120
+WHILE [#3 LT #2] DO 1
+  #4 = 360 / #2 * #3
+  X[#1 * COS[#4]] Y[#1 * SIN[#4]]
+  #3 = #3 + 1
+END 1
+G80
+M5
+M30</pre>
+                </div>
+                <div>
+                  <h4>4. Косвенная адресация</h4>
+                  <pre>#1 = 100        (начальный номер)
+#2 = 1          (значение)
+WHILE [#1 LE 105] DO 1
+  #[#1] = #2 * 2
+  #1 = #1 + 1
+  #2 = #2 + 1
+END 1
+( в #100…#105 записаны 2,4,6,8,10,12 )
+G1 X#100 Y#101 F500</pre>
+                </div>
+              </div>
+            </section>
+
+            <section class="ref-card span2" id="ref-codes">
+              <h3>G- и M-коды</h3>
+              <div class="codes-cols">
+                <div>
+                  <h4>Подготовительные G-коды</h4>
+                  <div id="ref-gcodes"></div>
+                </div>
+                <div>
+                  <h4>Вспомогательные M-коды</h4>
+                  <div id="ref-mcodes"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="ref-card span2" id="ref-threads">
+              <h3>Резьбы, свёрла и режимы</h3>
+              <div id="ref-threads-body"></div>
+            </section>
+
+            <section class="ref-card span2" id="ref-formulas">
+              <h3>Формулы, безопасность и совместимость</h3>
+              <div class="formula-cols">
+                <div>
+                  <h4>Режимы резания</h4>
+                  <ul>
+                    <li><code>n = 1000 · Vc / (π · D)</code> — обороты, об/мин</li>
+                    <li><code>F = n · fz · z</code> — подача фрезы, мм/мин</li>
+                    <li><code>Vc</code> — скорость резания, м/мин (алюминий ~250, сталь ~80, дерево ~400)</li>
+                    <li><code>fz</code> — подача на зуб: 0,02·D для алюминия, 0,008·D для стали</li>
+                    <li>Шаг растра — 30–50 % от Ø фрезы</li>
+                  </ul>
+                  <h4>Резьба и сверление</h4>
+                  <ul>
+                    <li>Сверло под резьбу: <code>d = D − P</code></li>
+                    <li>G84: <code>F = P · S</code> (мм/мин) или <code>F = P</code> при G95</li>
+                    <li>G83: <code>Q</code> — глубина захода, обычно 0,5–1 Ø</li>
+                    <li>G76: <code>Q</code> — смещение резца, <code>P</code> — пауза</li>
+                  </ul>
+                </div>
+                <div>
+                  <h4>Безопасность</h4>
+                  <ul>
+                    <li>Z0 — поверхность заготовки, глубина реза отрицательная</li>
+                    <li>Безопасная Z — выше детали и струбцин, обычно 5–10 мм</li>
+                    <li>Лимит Z в валидаторе — ваша страховка от глубокого реза</li>
+                    <li>Всегда проверяйте программу в симуляторе станка</li>
+                  </ul>
+                  <h4>Совместимость макросов</h4>
+                  <ul>
+                    <li><b>Fanuc / Haas</b> — Macro B: <code>#</code>, <code>IF</code>, <code>WHILE</code>, <code>G65</code></li>
+                    <li><b>LinuxCNC</b> — параметры <code>#1</code> / <code>#&lt;имя&gt;</code>, свои O-подпрограммы и функции</li>
+                    <li><b>GRBL</b> — макросов и переменных нет: только G-коды, параметризацию делайте в CAM</li>
+                    <li><b>Mach3</b> — макросы на VB, синтаксис Macro B не поддерживается полностью</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <hr class="divider" id="commonSep">
+        <div id="commonParams">
+          <div class="panel-head" style="margin-bottom:8px">
+            <h2 style="font-size:14px">⚙ Параметры обработки</h2>
+            <span class="sub">общие для гравировки и конструктора</span>
+          </div>
+          <div class="fields three">
+            <div class="field"><label for="spindle">Обороты S, об/мин</label><input id="spindle" type="number" value="12000" step="500"></div>
+            <div class="field"><label for="feed">Подача F, мм/мин</label><input id="feed" type="number" value="800" step="50"></div>
+            <div class="field"><label for="plungeFeed">Врезание Fz, мм/мин</label><input id="plungeFeed" type="number" value="200" step="10"></div>
+            <div class="field"><label for="depth">Глубина реза, мм</label><input id="depth" type="number" value="-1" step="0.1"></div>
+            <div class="field"><label for="depthPass">За проход, мм</label><input id="depthPass" type="number" value="-0.5" step="0.1"></div>
+            <div class="field"><label for="safeZ">Z безопасная, мм</label><input id="safeZ" type="number" value="5" step="0.5"></div>
+            <div class="field"><label for="x0">X0, мм</label><input id="x0" type="number" value="5" step="1"></div>
+            <div class="field"><label for="y0">Y0, мм</label><input id="y0" type="number" value="5" step="1"></div>
+            <div class="field"><label for="toolDiam">Ø инструмента, мм</label><input id="toolDiam" type="number" value="3" min="0.1" step="0.1"></div>
+            <div class="field"><label for="stepover">Шаг растра, мм</label><input id="stepover" type="number" value="1.2" min="0.1" step="0.1"></div>
+            <div class="field"><label for="ramp">Плавный вход, мм</label><input id="ramp" type="number" value="0" min="0" step="0.5"></div>
+            <div class="field"><label for="minZ">Лимит Z (мин.), мм</label><input id="minZ" type="number" value="-25" step="0.5"></div>
+            <div class="field"><label for="controller">Контроллер</label>
+              <select id="controller">
+                <option value="universal">Universal (нейтральный)</option>
+                <option value="grbl">GRBL (Candle, UGS)</option>
+                <option value="mach3">Mach3 / Mach4</option>
+                <option value="linuxcnc">LinuxCNC</option>
+                <option value="fanuc">Fanuc / Haas</option>
+                <option value="custom">Custom (свой постпроцессор)</option>
+              </select>
+            </div>
+          </div>
+          <div class="fields" style="margin-top:9px">
+            <div class="field check"><label for="coolant"><input type="checkbox" id="coolant"> СОЖ: M8 / M9</label></div>
+            <div class="field check"><label for="asciiComments"><input type="checkbox" id="asciiComments"> Комментарии латиницей</label></div>
+            <div class="field check"><label for="optimize"><input type="checkbox" id="optimize" checked> Оптимизировать быстрые ходы</label></div>
+          </div>
+          <div class="hint" id="ctrlHint">Синтаксис адаптируется под контроллер. Комментарии — в скобках, безопасны для GRBL и Fanuc.</div>
+        </div>
+
+        <div id="extraTools">
+        <details class="post-panel" id="postPanel">
+          <summary>⚙ Постпроцессор: WCS, дуги, M6, шапка и подвал</summary>
+          <div class="post-body">
+            <div class="fields">
+              <div class="field">
+                <label for="wcs">Рабочая система</label>
+                <select id="wcs">
+                  <option value="">не указывать</option>
+                  <option value="G54">G54</option>
+                  <option value="G55">G55</option>
+                  <option value="G56">G56</option>
+                  <option value="G57">G57</option>
+                  <option value="G58">G58</option>
+                  <option value="G59">G59</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="arcMode">Формат дуг</label>
+                <select id="arcMode">
+                  <option value="ij">I/J — центр</option>
+                  <option value="r">R — радиус</option>
+                </select>
+              </div>
+              <div class="field"><label for="decimals">Знаков после запятой</label><input id="decimals" type="number" value="3" min="0" max="4" step="1"></div>
+              <div class="field"><label for="toolNum">Номер инструмента для M6</label><input id="toolNum" type="number" value="1" min="1" max="99" step="1"></div>
+            </div>
+            <div class="fields" style="margin-top:9px">
+              <div class="field check"><label for="useM6"><input type="checkbox" id="useM6"> M6 + G43 в шапке</label></div>
+            </div>
+            <div id="customPost" style="display:none">
+              <label for="customHeader">Шапка (токены: {TITLE}, {DATE}, {TIME}, {TOOL}, {S}, {F}, {SAFE_Z}, {BLANK}, {WCS})</label>
+              <textarea id="customHeader" style="height:70px" spellcheck="false" placeholder="G4 P1&#10;( {TITLE} от {DATE} )"></textarea>
+              <label for="customFooter">Подвал (вставляется перед M5)</label>
+              <textarea id="customFooter" style="height:60px" spellcheck="false" placeholder="G65 P9010"></textarea>
+              <div class="fields" style="margin-top:9px">
+                <div class="field check"><label for="percent"><input type="checkbox" id="percent"> Проценты %</label></div>
+                <div class="field check"><label for="lineNumbers"><input type="checkbox" id="lineNumbers"> Номера строк N</label></div>
+                <div class="field check"><label for="returnHome"><input type="checkbox" id="returnHome" checked> Возврат X0Y0</label></div>
+              </div>
+            </div>
+            <div class="hint" id="postHint">WCS, формат дуг и точность действуют на все контроллеры. M6/G43 — для смены инструмента.</div>
+          </div>
+        </details>
+
+        <details class="tools-panel" id="toolsPanel">
+          <summary>🧰 Библиотека инструментов и смена T/M6</summary>
+          <div class="tools-body">
+            <div class="field check" style="padding-top:0">
+              <label for="useTools"><input type="checkbox" id="useTools"> Использовать несколько инструментов</label>
+            </div>
+            <div class="tool-list" id="toolList"></div>
+            <div class="toolbar end">
+              <button class="btn ghost small" id="addTool">+ Добавить инструмент</button>
+            </div>
+            <p class="hint">Каждому элементу назначается инструмент. Перед сменой программа поднимается на безопасную Z, затем M6, G43 и M3 с оборотами инструмента. GRBL M6 не поддерживает — проверьте постпроцессор.</p>
+          </div>
+        </details>
+
+        <details class="feeds">
+          <summary>📊 Калькулятор режимов резания</summary>
+          <div class="feeds-body">
+            <div class="fields">
+              <div class="field">
+                <label for="matType">Материал</label>
+                <select id="matType"></select>
+              </div>
+              <div class="field">
+                <label for="matOp">Тип обработки</label>
+                <select id="matOp">
+                  <option value="rough">Черновая</option>
+                  <option value="finish">Чистовая</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="matD">Ø фрезы, мм</label>
+                <input id="matD" type="number" value="3" min="0.1" step="0.1">
+              </div>
+              <div class="field">
+                <label for="matZ">Число зубьев</label>
+                <input id="matZ" type="number" value="2" min="1" step="1">
+              </div>
+            </div>
+            <div class="toolbar end">
+              <button class="btn small" id="matCalc">Рассчитать</button>
+              <button class="btn ghost small" id="matApply">Применить S/F</button>
+            </div>
+            <div class="note" id="matOut">— нажмите «Рассчитать» —</div>
+          </div>
+        </details>
+
+        <div class="quick">
+          <h3>🚀 Быстрый старт</h3>
+          <ol>
+            <li>Выберите вкладку: гравировка, конструктор фигур, резьба/сверление, дуги, параметры или шпаргалки.</li>
+            <li>Задайте глубину, подачу, диаметр инструмента и безопасную Z.</li>
+            <li>Проверьте чек-лист справа: зелёные галочки — можно скачивать.</li>
+            <li>Скачайте .nc и обязательно прогоните программу в симуляторе станка.</li>
+          </ol>
+          <p class="hint">Наведите курсор на «?» рядом с любым полем — появится объяснение. Кириллица в гравировке поддерживается: А–Я, Ё, №.</p>
+        </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col col-right" style="position:sticky;top:14px">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>📄 G-код</h2>
+          <span class="sub" id="outOwner">—</span>
+        </div>
+        <label for="output">Текст программы</label>
+        <textarea id="output" spellcheck="false" placeholder="Нажмите «Сгенерировать» или измените параметры"></textarea>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn ghost small" id="validateBtn">✓ Проверить</button>
+          <button class="btn ghost small" id="regenBtn">↻ Сгенерировать заново</button>
+          <span class="hint" id="editHint">Код можно править вручную — проверка обновится сама</span>
+        </div>
+        <div class="file-row">
+          <div class="fname">
+            <label for="fileName">Имя файла</label>
+            <input id="fileName" value="part.nc" autocomplete="off">
+          </div>
+          <button class="btn" id="download">⬇ Скачать</button>
+          <button class="btn ghost" id="copyBtn">📋 Копировать</button>
+        </div>
+        <div class="check-summary" id="checkSummary"></div>
+        <div class="checklist" id="checklist"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>👁 Предпросмотр</h2>
+          <span class="sub" id="previewInfo">—</span>
+        </div>
+        <svg id="preview" viewBox="0 0 460 380" width="460" height="380"></svg>
+        <div class="legend" id="legend"></div>
+        <div class="stats" id="statsBox"></div>
+      </section>
+    </div>
+  </div>
+
+
+</div>
+
+<div class="tipbox" id="tipbox"></div>
+<div class="toast" id="toast">Готово</div>
