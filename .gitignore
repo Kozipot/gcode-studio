@@ -2,3 +2,4 @@ node_modules/
 preview/
 dist/
 gcode-universal.html
+.wrangler-dry/
