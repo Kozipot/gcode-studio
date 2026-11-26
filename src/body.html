@@ -141,12 +141,13 @@
         <div class="tabpane" id="tab-threads">
           <div class="panel-head">
             <h2><span class="em">🔩</span> Резьба, сверление, растачивание</h2>
-            <span class="sub">G84 · G83 · G76</span>
+            <span class="sub">G84 · G83 · G76 · наружная</span>
           </div>
           <div class="subtabs" id="threadTabs">
             <button class="subtab active" data-sub="t84">G84 · резьба</button>
             <button class="subtab" data-sub="t83">G83 · сверление</button>
             <button class="subtab" data-sub="t76">G76 · растачивание</button>
+            <button class="subtab" data-sub="tExt">🔩 Наружная резьба</button>
           </div>
 
           <div class="subpane active" id="sub-t84">
@@ -296,6 +297,61 @@
             <div class="out-meta" id="t76Meta"></div>
             <pre class="out" id="t76Out"></pre>
             <div class="note" id="t76Info">G76 — тонкое растачивание резцом: Q — смещение резца на дне, P — пауза для «выхаживания».</div>
+          </div>
+
+          <div class="subpane" id="sub-tExt">
+            <div class="fields">
+              <div class="field full">
+                <label for="tExtThread">Резьба по таблице</label>
+                <select id="tExtThread"></select>
+              </div>
+              <div class="field">
+                <label for="tExtD">Наружный Ø резьбы, мм</label>
+                <input id="tExtD" type="number" value="10" min="0.5" step="0.5">
+              </div>
+              <div class="field">
+                <label for="tExtP">Шаг P, мм</label>
+                <input id="tExtP" type="number" value="1.5" min="0.05" step="0.05">
+              </div>
+              <div class="field">
+                <label for="tExtLen">Длина резьбы, мм</label>
+                <input id="tExtLen" type="number" value="20" min="0.1" step="1">
+              </div>
+              <div class="field">
+                <label for="tExtTool">Ø резьбовой фрезы, мм</label>
+                <input id="tExtTool" type="number" value="3" min="0.1" step="0.1">
+              </div>
+              <div class="field">
+                <label for="tExtPass">Радиальный съём за проход, мм</label>
+                <input id="tExtPass" type="number" value="0.1" min="0.02" step="0.02">
+              </div>
+              <div class="field">
+                <label for="tExtHand">Направление резьбы</label>
+                <select id="tExtHand">
+                  <option value="right">Правая (G2)</option>
+                  <option value="left">Левая (G3)</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="tExtS">Обороты S</label>
+                <input id="tExtS" type="number" value="6000" step="100">
+              </div>
+              <div class="field">
+                <label for="tExtF">Подача F, мм/мин</label>
+                <input id="tExtF" type="number" value="300" step="10">
+              </div>
+              <div class="field">
+                <label for="tExtFz">Врезание Fz, мм/мин</label>
+                <input id="tExtFz" type="number" value="100" step="10">
+              </div>
+            </div>
+            <div class="toolbar end">
+              <button class="btn small" id="tExtCalc">Рассчитать наружную</button>
+              <button class="btn ghost small" id="tExtMake">Сделать программой</button>
+            </div>
+            <div class="out-meta" id="tExtMeta"></div>
+            <pre class="out" id="tExtOut"></pre>
+            <div class="note" id="tExtInfo">Наружная резьба фрезой: винтовая интерполяция G2/G3 вокруг цилиндра. Глубина профиля h = 0,6134·P. Нужна резьбовая фреза; обычная концевая оставит широкую канавку.</div>
           </div>
 
           <hr class="divider">
@@ -717,6 +773,8 @@ G1 X#100 Y#101 F500</pre>
                     <li>G84: <code>F = P · S</code> (мм/мин) или <code>F = P</code> при G95</li>
                     <li>G83: <code>Q</code> — глубина захода, обычно 0,5–1 Ø</li>
                     <li>G76: <code>Q</code> — смещение резца, <code>P</code> — пауза</li>
+                    <li>Наружная резьба: <code>h = 0,6134 · P</code>; траектория <code>R = D/2 − h + Øфрезы/2</code></li>
+                    <li>Правая наружная — обход <code>G2</code>, левая — <code>G3</code>; проверьте направление на первом проходе</li>
                   </ul>
                 </div>
                 <div>

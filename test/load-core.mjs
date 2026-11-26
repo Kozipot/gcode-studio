@@ -20,7 +20,8 @@ export function loadCore(){
       ELEMENT_TYPES, elementSummary, transformGeom, geomBBox, shapePoly, shapeStar,
       shapeSpiral, shapeSine, shapeRect, shapeCircle, shapeSlot, rasterScan,
       pointInPolygon, templateScene, polygonBBox, distPointToSegment, nearPoly, polygonArea, offsetPolygon, offsetPath, alignElements, arrayElements, sceneChecks, segmentIntersectsRect, numOr, clamp, materialOf, threadOf, TABLES,
-      elementDepth, elementHeightInfo, Z_PROFILES, paramEval, evalParamExpr, PARAM_MODES, paramModeDefaults, buildParametric
+      elementDepth, elementHeightInfo, Z_PROFILES, paramEval, evalParamExpr, PARAM_MODES, paramModeDefaults, buildParametric,
+      calcExternalThread
     };
   })()`;
   const ctx = vm.createContext({ console, Math, JSON, isFinite, parseFloat, Number, String, Array, Object });

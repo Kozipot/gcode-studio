@@ -2250,6 +2250,119 @@ function calcBoring(inp){
   return {S: S, F: F, depth: depth, R: R, Q: Q, P: P, holes: holes.length, timeSec: timeSec, warnings: warnings, lines: lines, code: lines.join('\n')};
 }
 
+/* --------------------------- 12a2. Наружная резьба фрезой */
+/**
+ * Наружная (охватывающая) резьба концевой/резьбовой фрезой.
+ * Фреза обходит цилиндр снаружи по винтовой линии; за проход
+ * радиальная глубина увеличивается от наружного диаметра к впадине.
+ */
+function calcExternalThread(inp){
+  var i = inp || {};
+  var D = Math.max(0.5, Math.abs(numOr(i.d, 10)));
+  var P = Math.max(0.05, Math.abs(numOr(i.p, 1.5)));
+  var len = Math.max(0.1, Math.abs(numOr(i.len, 20)));
+  var toolD = Math.max(0.1, Math.abs(numOr(i.toolD, 3)));
+  var pass = Math.max(0.02, Math.abs(numOr(i.pass, 0.1)));
+  var hand = i.hand === 'left' ? 'left' : 'right';
+  var S = clamp(Math.round(numOr(i.s, 6000)), 100, 30000);
+  var F = Math.max(1, Math.round(numOr(i.f, 300)));
+  var Fz = Math.max(1, Math.round(numOr(i.fz, 100)));
+  var safeZ = numOr(i.safeZ, 5);
+  var topZ = numOr(i.topZ, 0);
+  var h = 0.6134 * P;
+  var rMajor = D / 2;
+  var rMinor = rMajor - h;
+  var rStart = rMajor + toolD / 2;
+  var rEnd = rMinor + toolD / 2;
+  var nPass = Math.max(1, Math.min(200, Math.ceil(h / pass)));
+  var dir = hand === 'left' ? 'G3' : 'G2';
+  var warnings = [];
+
+  if (rMinor <= 0.1) warnings.push('Глубина профиля ' + fmt(h, 3) + ' мм больше радиуса резьбы — проверьте диаметр и шаг.');
+  if (toolD > D) warnings.push('Ø фрезы ' + fmt(toolD, 2) + ' мм больше наружного диаметра резьбы — проверьте зазоры.');
+  if (len < P) warnings.push('Длина резьбы меньше шага — получится неполный виток.');
+  if (pass > h) warnings.push('Съём за проход больше глубины профиля — будет один проход.');
+  if (toolD < P * 0.6) warnings.push('Фреза тоньше 0,6 шага — возможен изгиб; для резьбы лучше специальная резьбовая фреза.');
+
+  function line(x, y, z, f){
+    var s = 'G1 X' + fmt(x) + ' Y' + fmt(y) + ' Z' + fmt(z);
+    if (f) s += ' F' + fmt(f, 0);
+    return s;
+  }
+  function arc(dirCode, x, y, z, ii, jj, f){
+    var s = dirCode + ' X' + fmt(x) + ' Y' + fmt(y) + ' Z' + fmt(z) +
+      ' I' + fmt(ii) + ' J' + fmt(jj);
+    if (f) s += ' F' + fmt(f, 0);
+    return s;
+  }
+
+  var lines = [];
+  lines.push('( НАРУЖНАЯ РЕЗЬБА ' + fmt(D, 2) + '×' + fmt(P, 2) + ' — ФРЕЗЕРОВАНИЕ )');
+  lines.push('( ' + (hand === 'left' ? 'левая' : 'правая') + ' резьба, ' + dir +
+    '; профиль h=' + fmt(h, 3) + ' мм; фреза Ø' + fmt(toolD, 2) + ' мм; проходов ' + nPass + ' )');
+  lines.push('( R наружный=' + fmt(rMajor, 3) + '; R впадины=' + fmt(rMinor, 3) +
+    '; R траектории=' + fmt(rEnd, 3) + ' )');
+  lines.push('G0 Z' + fmt(safeZ));
+  lines.push('M3 S' + fmt(S, 0));
+
+  for (var pi = 1; pi <= nPass; pi++){
+    var R = rStart + (rEnd - rStart) * pi / nPass;
+    lines.push('( проход ' + pi + '/' + nPass + ', R=' + fmt(R, 3) + ' )');
+    lines.push('G0 X' + fmt(R) + ' Y0 Z' + fmt(safeZ));
+    lines.push(line(R, 0, topZ, Fz));
+    var z = topZ;
+    var firstArc = true;
+    var full = Math.floor(len / P + 1e-9);
+    for (var rev = 0; rev < full; rev++){
+      var zMid = z - P / 2;
+      var zEnd = z - P;
+      if (dir === 'G2'){
+        lines.push(arc('G2', -R, 0, zMid, -R, 0, firstArc ? F : 0));
+        lines.push(arc('G2', R, 0, zEnd, R, 0, 0));
+      } else {
+        lines.push(arc('G3', -R, 0, zMid, -R, 0, firstArc ? F : 0));
+        lines.push(arc('G3', R, 0, zEnd, R, 0, 0));
+      }
+      firstArc = false;
+      z = zEnd;
+    }
+    var rem = len - full * P;
+    if (rem > 1e-6){
+      var sweep = 2 * Math.PI * rem / P;
+      var zEnd2 = z - rem;
+      if (sweep > Math.PI + 1e-9){
+        var zHalf = z - rem / 2;
+        if (dir === 'G2') lines.push(arc('G2', -R, 0, zHalf, -R, 0, firstArc ? F : 0));
+        else lines.push(arc('G3', -R, 0, zHalf, -R, 0, firstArc ? F : 0));
+        var ey = (dir === 'G3' ? 1 : -1) * R * Math.sin(sweep);
+        var ex = R * Math.cos(sweep);
+        if (dir === 'G2') lines.push(arc('G2', ex, ey, zEnd2, R, 0, 0));
+        else lines.push(arc('G3', ex, ey, zEnd2, R, 0, 0));
+      } else {
+        var ey2 = (dir === 'G3' ? 1 : -1) * R * Math.sin(sweep);
+        var ex2 = R * Math.cos(sweep);
+        if (dir === 'G2') lines.push(arc('G2', ex2, ey2, zEnd2, -R, 0, firstArc ? F : 0));
+        else lines.push(arc('G3', ex2, ey2, zEnd2, -R, 0, firstArc ? F : 0));
+      }
+    }
+    lines.push('G0 Z' + fmt(safeZ));
+  }
+
+  var cutLen = 0;
+  for (var p2 = 1; p2 <= nPass; p2++){
+    var rr = rStart + (rEnd - rStart) * p2 / nPass;
+    cutLen += 2 * Math.PI * rr * (len / P);
+  }
+  var timeSec = cutLen / Math.max(1, F) * 60 + nPass * (2 * Math.abs(safeZ - topZ) / Math.max(1, Fz) * 60);
+
+  return {
+    D: D, P: P, len: len, h: h, toolD: toolD, pass: pass, nPass: nPass,
+    rMajor: rMajor, rMinor: rMinor, rStart: rStart, rEnd: rEnd,
+    hand: hand, S: S, F: F, Fz: Fz, timeSec: timeSec,
+    warnings: warnings, lines: lines, code: lines.join('\n')
+  };
+}
+
 /* --------------------------- 12b. Параметрическое программирование */
 function paramRound(v){
   return v < 0 ? -Math.round(-v) : Math.round(v);

@@ -165,6 +165,34 @@ test('G76 рассчитан', () => F('t76Out').textContent.includes('G76'));
 subtab('t84');
 test('G84 снова активен', () => F('sub-t84').classList.contains('active'));
 
+console.log('\n— Наружная резьба —');
+subtab('tExt');
+await sleep(250);
+test('вкладка «Наружная резьба» активна', () => F('sub-tExt').classList.contains('active'));
+test('четыре подвкладки резьбы', () => qa('.subtab').length === 4 || 'подвкладок ' + qa('.subtab').length);
+test('наружная резьба рассчитана', () => F('tExtOut').textContent.includes('НАРУЖНАЯ РЕЗЬБА'));
+test('наружная резьба: правая — G2', () => F('tExtOut').textContent.includes('G2 X-'));
+test('наружная резьба: метаданные с проходами', () => F('tExtMeta').textContent.includes('проходов'));
+setVal('tExtThread', 'M12');
+await sleep(250);
+test('таблица наружной резьбы: M12 → 12×1.75', () =>
+  F('tExtD').value === '12' && F('tExtP').value === '1.75' && F('tExtOut').textContent.includes('12×1.75'));
+setVal('tExtD', '12');
+setVal('tExtP', '1.75');
+setVal('tExtLen', '10');
+click('#tExtCalc');
+await sleep(250);
+test('наружная резьба: параметры 12×1.75', () => F('tExtOut').textContent.includes('12×1.75'));
+test('наружная резьба: чек-лист чистый', () => errors() === 0 || 'ошибок ' + errors());
+click('#tExtMake');
+await sleep(300);
+test('наружная резьба вставлена в программу', () => output().includes('НАРУЖНАЯ РЕЗЬБА') && output().includes('G2 X-'));
+test('наружная резьба: программа валидна', () => errors() === 0 || 'ошибок ' + errors());
+setVal('tExtHand', 'left');
+await sleep(300);
+test('левая наружная резьба: G3', () => F('tExtOut').textContent.includes('G3 X-'));
+subtab('t84');
+
 console.log('\n— Импорт —');
 tab('import');
 F('importCode').value = 'G21\nG90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\nM5\n';

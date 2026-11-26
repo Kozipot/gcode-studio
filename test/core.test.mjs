@@ -622,6 +622,35 @@ test('fanuc: параметрическая программа с процент
   assert.ok(r.code.includes('#100'));
 });
 
+console.log('\n— Наружная резьба фрезой —');
+test('наружная резьба: винтовая G2, профиль и проходы', () => {
+  const r = C.calcExternalThread({ d:10, p:1.5, len:20, toolD:3, pass:0.1, hand:'right', s:6000, f:300, fz:100, safeZ:5 });
+  assert.equal(r.nPass, 10);
+  assert.ok(Math.abs(r.h - 0.6134 * 1.5) < 1e-9, 'h=' + r.h);
+  assert.ok(Math.abs(r.rMajor - 5) < 1e-9);
+  assert.ok(Math.abs(r.rMinor - (5 - r.h)) < 1e-9);
+  assert.ok(Math.abs(r.rEnd - (r.rMinor + 1.5)) < 1e-9);
+  assert.ok(r.code.includes('G2 X-'));
+  assert.ok(!r.code.includes('G3 X-'), 'правая резьба не должна быть G3');
+  assert.ok(r.code.includes('НАРУЖНАЯ РЕЗЬБА'));
+});
+test('левая наружная резьба: G3', () => {
+  const r = C.calcExternalThread({ d:12, p:1.75, len:15, toolD:3, pass:0.1, hand:'left', safeZ:5 });
+  assert.ok(r.code.includes('G3 X-'));
+  assert.ok(!r.code.includes('G2 X-'), 'левая резьба не должна быть G2');
+});
+test('наружная резьба: длина не кратна шагу — корректный неполный виток', () => {
+  const r = C.calcExternalThread({ d:10, p:1.5, len:20, toolD:3, pass:0.1, hand:'right', safeZ:5 });
+  const code = C.wrapSnippet(r.code, 'НАРУЖНАЯ', { safeZ:5, controller:'universal' });
+  const v = C.validateGcode(code, { minZ:-25, blank:{ enabled:false }, safeZ:5, toolD:3 });
+  assert.equal(v.errors, 0, JSON.stringify(v.items.filter(i => i.status === 'error')));
+  assert.ok(Math.abs(v.parsed.minCutZ + 20) < 1e-6, 'minCutZ=' + v.parsed.minCutZ);
+});
+test('наружная резьба: слишком глубокая — предупреждение', () => {
+  const r = C.calcExternalThread({ d:3, p:3, len:10, toolD:3, pass:0.1, safeZ:5 });
+  assert.ok(r.warnings.length > 0);
+});
+
 console.log('\n— Производительность —');
 test('карман 200×150 считается быстро (<1500 мс)', () => {
   const sc = scene(220, 170, [{ type:'pocket', params:{ profile:'rect', w:200, h:150 } }]);

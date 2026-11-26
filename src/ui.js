@@ -55,6 +55,16 @@ var TIPS = {
   t76P: 'Пауза «выхаживания» на дне. Единицы (секунды или миллисекунды) зависят от контроллера — сверьтесь с документацией.',
   t76S: 'Обороты шпинделя при растачивании.',
   t76F: 'Подача растачивания в мм/мин. Обычно небольшая — 30–80 мм/мин.',
+  tExtD: 'Наружный диаметр резьбы по вершинам профиля. Для M10 это 10 мм.',
+  tExtThread: 'Выбери стандартную метрическую резьбу — диаметр и шаг подставятся автоматически.',
+  tExtP: 'Шаг резьбы. Глубина профиля считается как 0,6134·P.',
+  tExtLen: 'Длина нарезаемой резьбы от Z0 вниз. Программа делает винтовую интерполяцию на эту глубину.',
+  tExtTool: 'Диаметр резьбовой фрезы. От него зависит радиус траектории: R = D/2 − h + Øфрезы/2.',
+  tExtPass: 'Радиальный съём за один проход от наружного диаметра к впадине. Меньше — больше проходов и чище резьба.',
+  tExtHand: 'Правая резьба — обход G2, левая — G3. Проверьте направление вращения шпинделя и тип фрезы.',
+  tExtS: 'Обороты шпинделя для резьбовой фрезы. Для твердосплавной фрезы в алюминии обычно 5000–10000 об/мин.',
+  tExtF: 'Подача винтовой интерполяции в мм/мин. Начинайте с небольшой и проверяйте нагрузку.',
+  tExtFz: 'Подача вертикального врезания перед винтовой интерполяцией.',
   hRows: 'Количество рядов отверстий по Y.',
   hCols: 'Количество колонок отверстий по X.',
   hDx: 'Шаг между отверстиями по X.',
@@ -1253,6 +1263,7 @@ function initThreadUI(){
     return {value:t.size, label:t.size + ' — шаг ' + fmt(t.p, 2) + ' мм'};
   });
   fillSelect('t84Thread', threads, 'M6');
+  fillSelect('tExtThread', threads, 'M10');
   var mats = materialOptions();
   fillSelect('t84Mat', mats, 'aluminium');
   fillSelect('t83Mat', mats, 'steel');
@@ -1270,11 +1281,20 @@ function initThreadUI(){
     calcThread('t84');
   });
 
-  ['t84Calc','t84Make','t83Calc','t83Make','t76Calc','t76Make'].forEach(function(id){
+  var extSel = $('tExtThread');
+  if (extSel) extSel.addEventListener('change', function(){
+    var t = threadOf(extSel.value);
+    if (!t) return;
+    $('tExtD').value = t.d;
+    $('tExtP').value = t.p;
+    calcThread('tExt');
+  });
+
+  ['t84Calc','t84Make','t83Calc','t83Make','t76Calc','t76Make','tExtCalc','tExtMake'].forEach(function(id){
     var btn = $(id);
     if (!btn) return;
     var isMake = /Make$/.test(id);
-    var kind = id.slice(0, 3);
+    var kind = id.replace(/(Calc|Make)$/, '');
     btn.addEventListener('click', function(){
       if (isMake) makeThreadProgram(kind);
       else calcThread(kind);
@@ -1288,6 +1308,10 @@ function initThreadUI(){
   });
   ['t76D','t76Depth','t76R','t76Q','t76P','t76S','t76F'].forEach(function(id){
     var el = $(id); if (el) el.addEventListener('input', function(){ calcThread('t76'); });
+  });
+  ['tExtD','tExtP','tExtLen','tExtTool','tExtPass','tExtHand','tExtS','tExtF','tExtFz'].forEach(function(id){
+    var el = $(id); if (el) el.addEventListener('input', function(){ calcThread('tExt'); });
+    if (el && el.tagName === 'SELECT') el.addEventListener('change', function(){ calcThread('tExt'); });
   });
   ['hRows','hCols','hDx','hDy','hX0','hY0'].forEach(function(id){
     var el = $(id); if (el) el.addEventListener('input', function(){
@@ -1376,6 +1400,28 @@ function calcThread(kind){
         ? '⚠ ' + res.warnings.map(esc).join('<br>⚠ ')
         : '✅ Параметры корректны.') +
         '<br>G83 выводит стружку на каждом заходе; для глубоких отверстий уменьшайте Q.';
+    } else if (kind === 'tExt'){
+      res = calcExternalThread({
+        d: num('tExtD'), p: num('tExtP'), len: num('tExtLen'),
+        toolD: num('tExtTool'), pass: num('tExtPass'),
+        hand: $('tExtHand').value, s: num('tExtS'), f: num('tExtF'), fz: num('tExtFz'),
+        safeZ: p.safeZ
+      });
+      outEl.textContent = res.code;
+      metaEl.innerHTML = metaBadges([
+        ['резьба', 'Ø' + fmt(res.D, 2) + '×' + fmt(res.P, 2)],
+        ['h', fmt(res.h, 3) + ' мм'],
+        ['фреза', 'Ø' + fmt(res.toolD, 2)],
+        ['проходов', res.nPass],
+        ['S', fmt(res.S, 0) + ' об/мин'],
+        ['F', fmt(res.F, 0) + ' мм/мин'],
+        ['~время', formatTime(res.timeSec)]
+      ]);
+      infoEl.className = 'note' + (res.warnings.length ? ' warn' : ' ok');
+      infoEl.innerHTML = (res.warnings.length
+        ? '⚠ ' + res.warnings.map(esc).join('<br>⚠ ')
+        : '✅ Параметры корректны. R траектории: ' + fmt(res.rEnd, 3) + ' мм, впадина Ø' + fmt(res.rMinor * 2, 3) + ' мм.') +
+        '<br>Наружная резьба фрезой: нужна резьбовая фреза, а не обычная концевая. Проверьте направление G2/G3 и вращение шпинделя на первом проходе.';
     } else {
       res = calcBoring({
         d: num('t76D'), depth: num('t76Depth'), r: num('t76R'),
@@ -1412,7 +1458,7 @@ function makeThreadProgram(kind, silent){
   if (!res){ calcThread(kind); res = state.thread[kind]; }
   if (!res) return;
   var p = readParams();
-  var title = {t84:'РЕЗЬБА G84', t83:'СВЕРЛЕНИЕ', t76:'РАСТАЧИВАНИЕ G76'}[kind] || 'ОПЕРАЦИЯ';
+  var title = {t84:'РЕЗЬБА G84', t83:'СВЕРЛЕНИЕ', t76:'РАСТАЧИВАНИЕ G76', tExt:'НАРУЖНАЯ РЕЗЬБА'}[kind] || 'ОПЕРАЦИЯ';
   var code = wrapSnippet(res.code, title, {safeZ:p.safeZ, controller:p.controller, asciiComments:p.asciiComments,
     wcs:p.wcs, useM6:p.useM6, toolNumber:p.toolNum});
   var st = parseProgram(code);
@@ -2302,6 +2348,7 @@ function init(){
   calcThread('t84');
   calcThread('t83');
   calcThread('t76');
+  calcThread('tExt');
   calcMaterial();
   toggleCustomPost();
   switchTab('engrave');
