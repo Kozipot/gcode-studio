@@ -1207,7 +1207,7 @@ function initPreview3D(){
 
   var drag = null;
   cv.addEventListener('pointerdown', function(e){
-    if (typeof cv.setPointerCapture === 'function') cv.setPointerCapture(e.pointerId);
+    try { if (typeof cv.setPointerCapture === 'function') cv.setPointerCapture(e.pointerId); } catch (err){}
     drag = {x:e.clientX, y:e.clientY, button:e.button, shift:e.shiftKey};
     cv.style.cursor = 'grabbing';
   });
@@ -1221,7 +1221,10 @@ function initPreview3D(){
       state.cam3d.panY += dy;
     } else {
       state.cam3d.yaw += dx * 0.01;
-      state.cam3d.pitch = clampNum(state.cam3d.pitch + dy * 0.01, 0.12, 1.42);
+      var pitch = state.cam3d.pitch + dy * 0.01;
+      if (pitch > Math.PI) pitch -= Math.PI * 2;
+      if (pitch < -Math.PI) pitch += Math.PI * 2;
+      state.cam3d.pitch = pitch;
     }
     if (state.preview3d) drawPreview3D();
   });
