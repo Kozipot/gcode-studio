@@ -1,9 +1,11 @@
 {
   // Cloudflare Workers static assets project for G-CODE Studio.
-  // Build command: node build.mjs (creates dist/index.html)
-  // Deploy command: npx wrangler deploy
+  // `wrangler deploy` runs the build first, then uploads dist/.
   "name": "gcode-studio",
   "compatibility_date": "2026-11-26",
+  "build": {
+    "command": "node build.mjs"
+  },
   "assets": {
     "directory": "./dist"
   }
