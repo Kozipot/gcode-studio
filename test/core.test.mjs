@@ -243,6 +243,18 @@ test('полный круг G3 только с I/J (без X/Y) распозна
     { minZ:-25, blank:{ enabled:false }, safeZ:5, toolD:3 });
   assert.equal(v.errors, 0, JSON.stringify(v.items.filter(i => i.status === 'error')));
 });
+test('калькулятор: полный круг из текущей точки в неё же', () => {
+  const res = C.solveFullCircle(10, 0, 0, 0, 'G3');
+  assert.ok(!res.error);
+  assert.equal(res.full, true);
+  assert.ok(Math.abs(res.r - 10) < 1e-9);
+  assert.ok(Math.abs(res.i + 10) < 1e-9);
+  assert.ok(Math.abs(res.j) < 1e-9);
+  assert.equal(res.sweepDeg, 360);
+  assert.equal(res.line, 'G3 X10 Y0 I-10 J0');
+  const bad = C.solveFullCircle(10, 0, 10, 0, 'G3');
+  assert.ok(bad.error);
+});
 test('импорт кода без M30 — ошибка в чек-листе', () => {
   const v = check('G21\nG90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\nM5\n');
   assert.equal(v.items.find(i => i.id === 'end').status, 'error');

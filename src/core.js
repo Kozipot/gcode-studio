@@ -2222,6 +2222,20 @@ function solveArc(sx, sy, ex, ey, rIn, dir){
   };
 }
 
+function solveFullCircle(sx, sy, cx, cy, dir){
+  var I = cx - sx, J = cy - sy;
+  var r = Math.hypot(I, J);
+  if (!isFinite(r) || r < 1e-6) return {error: 'Центр совпадает с точкой старта — радиус 0.'};
+  var d = dir === 'G2' ? 'G2' : 'G3';
+  return {
+    full: true, sx: sx, sy: sy, ex: sx, ey: sy,
+    cx: cx, cy: cy, i: I, j: J, r: r,
+    chord: 0, sweepDeg: 360, arcLen: 2 * Math.PI * r,
+    line: d + ' X' + fmt(sx) + ' Y' + fmt(sy) + ' I' + fmt(I) + ' J' + fmt(J),
+    rLine: ''
+  };
+}
+
 /* --------------------------- 12. Резьба / сверление / растачивание */
 function materialOf(key){
   var mats = (typeof TABLES !== 'undefined' && TABLES.materials) ? TABLES.materials : {};

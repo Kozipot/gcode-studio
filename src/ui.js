@@ -111,6 +111,9 @@ var TIPS = {
   output: 'Итоговая программа. Её можно править вручную, проверять и скачивать — скачивание доступно, если чек-лист без ошибок.',
   arcSx: 'X начала дуги.',
   arcSy: 'Y начала дуги.',
+  arcFull: 'Полный круг 360°: начальная точка одновременно является конечной. Центр задаётся полями X/Y, в G-код пойдут I/J.',
+  arcCx: 'X центра полного круга. Радиус считается как расстояние от начальной точки до центра.',
+  arcCy: 'Y центра полного круга. Радиус считается как расстояние от начальной точки до центра.',
   arcEx: 'X конца дуги.',
   arcEy: 'Y конца дуги.',
   arcR: 'Радиус дуги. Пусто — половина хорды, то есть полуокружность.',
@@ -1914,9 +1917,34 @@ function importProgram(silent){
 }
 
 /* ---------------------------------------------------------------- дуги */
+function syncArcFullFields(){
+  var full = !!($('arcFull') && $('arcFull').checked);
+  if ($('arcEx')) $('arcEx').disabled = full;
+  if ($('arcEy')) $('arcEy').disabled = full;
+  if ($('arcR')) $('arcR').disabled = full;
+  if ($('arcCxWrap')) $('arcCxWrap').style.display = full ? '' : 'none';
+  if ($('arcCyWrap')) $('arcCyWrap').style.display = full ? '' : 'none';
+  ['arcExWrap','arcEyWrap','arcRWrap'].forEach(function(id){
+    var el = $(id);
+    if (el) el.style.display = full ? 'none' : '';
+  });
+  if (full){
+    if ($('arcEx')) $('arcEx').value = $('arcSx').value;
+    if ($('arcEy')) $('arcEy').value = $('arcSy').value;
+  }
+}
+
 function updateArc(){
-  var rIn = parseFloat($('arcR').value);
-  var res = solveArc(num('arcSx'), num('arcSy'), num('arcEx'), num('arcEy'), isFinite(rIn) ? rIn : null, $('arcDir').value);
+  syncArcFullFields();
+  var full = !!($('arcFull') && $('arcFull').checked);
+  var sx = num('arcSx'), sy = num('arcSy'), dir = $('arcDir').value;
+  var res;
+  if (full){
+    res = solveFullCircle(sx, sy, num('arcCx'), num('arcCy'), dir);
+  } else {
+    var rIn = parseFloat($('arcR').value);
+    res = solveArc(sx, sy, num('arcEx'), num('arcEy'), isFinite(rIn) ? rIn : null, dir);
+  }
   state.arc = res;
   if (res.error){
     $('arcOut').textContent = '⚠ ' + res.error;
@@ -1925,12 +1953,21 @@ function updateArc(){
     return;
   }
   if ($('arcInfo')) $('arcInfo').textContent = 'R=' + fmt(res.r) + ' · ' + res.sweepDeg.toFixed(1) + '° · ' + fmt(res.arcLen) + ' мм';
-  $('arcOut').textContent =
-    'Центр: X = ' + fmt(res.cx) + ', Y = ' + fmt(res.cy) + '\n' +
-    'I = ' + fmt(res.i) + '   J = ' + fmt(res.j) + '\n' +
-    'R = ' + fmt(res.r) + ' мм · хорда ' + fmt(res.chord) + ' мм\n' +
-    'Угол: ' + res.sweepDeg.toFixed(2) + '° · длина дуги ' + fmt(res.arcLen) + ' мм\n\n' +
-    res.line + '\n' + res.rLine;
+  if (full){
+    $('arcOut').textContent =
+      'Центр: X = ' + fmt(res.cx) + ', Y = ' + fmt(res.cy) + '\n' +
+      'I = ' + fmt(res.i) + '   J = ' + fmt(res.j) + '\n' +
+      'R = ' + fmt(res.r) + ' мм · полный круг 360°\n' +
+      'Длина круга: ' + fmt(res.arcLen) + ' мм\n\n' +
+      res.line;
+  } else {
+    $('arcOut').textContent =
+      'Центр: X = ' + fmt(res.cx) + ', Y = ' + fmt(res.cy) + '\n' +
+      'I = ' + fmt(res.i) + '   J = ' + fmt(res.j) + '\n' +
+      'R = ' + fmt(res.r) + ' мм · хорда ' + fmt(res.chord) + ' мм\n' +
+      'Угол: ' + res.sweepDeg.toFixed(2) + '° · длина дуги ' + fmt(res.arcLen) + ' мм\n\n' +
+      res.line + '\n' + res.rLine;
+  }
   drawArcPreview(res);
 }
 
@@ -1948,8 +1985,8 @@ function drawArcPreview(res){
     var a = aS + sign * sweep * i / 64;
     pts.push([cx + r*Math.cos(a), cy + r*Math.sin(a)]);
   }
-  var minX = Math.min(sx, ex, cx), maxX = Math.max(sx, ex, cx);
-  var minY = Math.min(sy, ey, cy), maxY = Math.max(sy, ey, cy);
+  var minX = Math.min(sx, ex, cx - r), maxX = Math.max(sx, ex, cx + r);
+  var minY = Math.min(sy, ey, cy - r), maxY = Math.max(sy, ey, cy + r);
   var w = Math.max(maxX - minX, 0.001), h = Math.max(maxY - minY, 0.001);
   var W = 440, H = 300, pad = 42;
   var sc = Math.min((W - 2*pad) / w, (H - 2*pad) / h);
@@ -1964,14 +2001,18 @@ function drawArcPreview(res){
   }
   svg.appendChild(el('rect', {x:0, y:0, width:W, height:H, fill:'#0a0a0d'}));
   svg.appendChild(el('circle', {cx:tx(cx), cy:ty(cy), r:r*sc, fill:'none', stroke:'#262630', 'stroke-width':1, 'stroke-dasharray':'3 4'}));
-  svg.appendChild(el('line', {x1:tx(sx), y1:ty(sy), x2:tx(ex), y2:ty(ey), stroke:'#5c5c68', 'stroke-width':1, 'stroke-dasharray':'5 4'}));
+  if (!res.full){
+    svg.appendChild(el('line', {x1:tx(sx), y1:ty(sy), x2:tx(ex), y2:ty(ey), stroke:'#5c5c68', 'stroke-width':1, 'stroke-dasharray':'5 4'}));
+    svg.appendChild(el('line', {x1:tx(cx), y1:ty(cy), x2:tx(ex), y2:ty(ey), stroke:'#4a90d9', 'stroke-width':1, 'stroke-dasharray':'3 3'}));
+  }
   svg.appendChild(el('line', {x1:tx(cx), y1:ty(cy), x2:tx(sx), y2:ty(sy), stroke:'#4a90d9', 'stroke-width':1, 'stroke-dasharray':'3 3'}));
-  svg.appendChild(el('line', {x1:tx(cx), y1:ty(cy), x2:tx(ex), y2:ty(ey), stroke:'#4a90d9', 'stroke-width':1, 'stroke-dasharray':'3 3'}));
   svg.appendChild(el('polyline', {
     points: pts.map(function(p){ return tx(p[0]) + ',' + ty(p[1]); }).join(' '),
     fill:'none', stroke:'#ff6b35', 'stroke-width':2.4, 'stroke-linecap':'round'
   }));
-  [[sx, sy, 'S', '#4ade80'], [ex, ey, 'E', '#ff5d5d'], [cx, cy, 'C', '#4a90d9']].forEach(function(p){
+  var marks = [[sx, sy, 'S', '#4ade80'], [cx, cy, 'C', '#4a90d9']];
+  if (!res.full) marks.push([ex, ey, 'E', '#ff5d5d']);
+  marks.forEach(function(p){
     svg.appendChild(el('circle', {cx:tx(p[0]), cy:ty(p[1]), r:4.5, fill:p[3], stroke:'#000', 'stroke-width':1}));
     var t = el('text', {x:tx(p[0])+7, y:ty(p[1])-7, fill:p[3], 'font-size':12, 'font-family':'system-ui', 'font-weight':700});
     t.textContent = p[2];
@@ -2029,7 +2070,11 @@ function resetArc(){
   $('arcEx').value = 0;
   $('arcEy').value = 10;
   $('arcR').value = '';
+  if ($('arcFull')) $('arcFull').checked = false;
+  if ($('arcCx')) $('arcCx').value = 0;
+  if ($('arcCy')) $('arcCy').value = 0;
   selectOption($('arcDir'), 'G3');
+  syncArcFullFields();
   updateArc();
   showToast('Параметры дуги сброшены');
 }
@@ -2503,7 +2548,19 @@ function initCommonEvents(){
 
   $('arcSolve').addEventListener('click', updateArc);
   $('arcDir').addEventListener('change', updateArc);
-  ['arcSx','arcSy','arcEx','arcEy','arcR'].forEach(function(id){
+  if ($('arcFull')) $('arcFull').addEventListener('change', function(){
+    var full = this.checked;
+    if (full){
+      $('arcEx').value = $('arcSx').value;
+      $('arcEy').value = $('arcSy').value;
+    } else if (num('arcEx') === num('arcSx') && num('arcEy') === num('arcSy')){
+      $('arcEx').value = fmt(num('arcSx') + 10);
+      $('arcEy').value = $('arcSy').value;
+    }
+    syncArcFullFields();
+    updateArc();
+  });
+  ['arcSx','arcSy','arcEx','arcEy','arcR','arcCx','arcCy'].forEach(function(id){
     var el = $(id);
     if (el) el.addEventListener('input', function(){
       clearTimeout(window._arcTimer);
