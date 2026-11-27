@@ -273,9 +273,14 @@ await sleep(250);
 test('вкладка «Картинка» открыта', () => q('#tab-image').classList.contains('active'));
 test('картинка: поля загрузки и настроек', () => !!F('imageFile') && !!F('imageMode') && !!F('imageWidth') && !!F('imageGenerate'));
 test('картинка: яркость, контраст, гамма и авто', () => !!F('imageBrightness') && !!F('imageContrast') && !!F('imageGamma') && !!F('imageAuto'));
+test('картинка: авто-гамма и переключатель', () => !!F('imageAutoGamma') && !!F('imageAutoGammaOn') && F('imageAutoGammaOn').checked);
 test('картинка: пустое состояние', () => F('imageInfo').textContent.includes('загрузите'));
 test('картинка: авто-контраст без файла не падает', () => {
   click('#imageAuto');
+  return F('imageInfo').textContent.includes('Сначала загрузите');
+});
+test('картинка: авто-гамма без файла не падает', () => {
+  click('#imageAutoGamma');
   return F('imageInfo').textContent.includes('Сначала загрузите');
 });
 test('картинка: шаг строк выключен для точек', () => F('imageLineStep').disabled === true);

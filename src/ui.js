@@ -132,6 +132,8 @@ var TIPS = {
   imageBlack: 'Чёрный уровень: всё темнее этого значения станет чёрным. Убирает серый фон.',
   imageWhite: 'Белый уровень: всё светлее этого значения станет белым. Растягивает диапазон яркости.',
   imageAutoLoad: 'При загрузке автоматически растянуть уровни по гистограмме: 2% самых тёмных станут чёрными, 2% самых светлых — белыми.',
+  imageAutoGammaOn: 'После авто-контраста подобрать гамму по средней яркости, чтобы вытянуть детали в тенях и не пересветить фон.',
+  imageAutoGamma: 'Подобрать гамму по текущим уровням, яркости и контрасту, не меняя уровни.',
   imageDither: 'Floyd–Steinberg или Atkinson распределяют ошибку яркости — лучше передают полутона точками. «Нет» — простой порог.',
   imageInvert: 'Инвертировать: гравировать светлые участки вместо тёмных.',
   imageDepth: 'Глубина Z за один проход. Обычно -0,2…-1 мм для гравировки.',
@@ -341,6 +343,7 @@ var PROJECT_FIELDS = ['engrMode','engrKind','engrText','calcExpr','engrSize','en
   'returnHome','useTools',
   'imageMode','imageWidth','imageHeight','imageAspect','imageRes','imageLineStep','imageThreshold',
   'imageBrightness','imageContrast','imageGamma','imageBlack','imageWhite','imageAutoLoad',
+  'imageAutoGammaOn',
   'imageDither','imageInvert','imageDepth','imageFeed','imagePlunge','imageSafeZ'];
 var STORAGE_KEY = 'gcodeStudio.project.v1';
 var store = null;
@@ -2817,21 +2820,27 @@ function drawImageSource(){
 
 function autoContrastImage(notify){
   if (!state.image){ setImageInfo('⚠ Сначала загрузите PNG/JPEG.'); return; }
-  var gray = state.image.gray;
-  var hist = new Array(256).fill(0);
-  for (var i = 0; i < gray.length; i++) hist[clampNum(Math.round(gray[i]), 0, 255)]++;
-  var total = gray.length, lo = total * 0.02, hi = total * 0.98;
-  var acc = 0, black = 0;
-  for (var b = 0; b < 256; b++){ acc += hist[b]; if (acc >= lo){ black = b; break; } }
-  acc = 0;
-  var white = 255;
-  for (var w = 0; w < 256; w++){ acc += hist[w]; if (acc >= hi){ white = w; break; } }
-  if (white - black < 8){ black = 0; white = 255; }
-  $('imageBlack').value = black;
-  $('imageWhite').value = white;
+  var lv = autoImageLevels(state.image.gray);
+  $('imageBlack').value = lv.black;
+  $('imageWhite').value = lv.white;
+  var gammaTxt = '';
+  if ($('imageAutoGammaOn') && $('imageAutoGammaOn').checked){
+    var g = autoImageGamma(state.image.gray, readImageOptions());
+    $('imageGamma').value = fmt(g, 2);
+    gammaTxt = ' · γ ' + fmt(g, 2);
+  }
   drawImageSource();
   generateImage();
-  if (notify !== false) showToast('Авто-контраст: уровни ' + black + '…' + white);
+  if (notify !== false) showToast('Авто-контраст: уровни ' + lv.black + '…' + lv.white + gammaTxt);
+}
+
+function autoGammaImage(notify){
+  if (!state.image){ setImageInfo('⚠ Сначала загрузите PNG/JPEG.'); return; }
+  var g = autoImageGamma(state.image.gray, readImageOptions());
+  $('imageGamma').value = fmt(g, 2);
+  drawImageSource();
+  generateImage();
+  if (notify !== false) showToast('Авто-гамма: ' + fmt(g, 2));
 }
 
 function resetImageTone(){
@@ -2992,7 +3001,7 @@ function initImageUI(){
     el.addEventListener('input', function(){ scheduleImageGenerate(); scheduleHistory(); });
     el.addEventListener('change', function(){ scheduleImageGenerate(); scheduleHistory(); });
   });
-  ['imageDither','imageInvert','imageAspect','imageAutoLoad'].forEach(function(id){
+  ['imageDither','imageInvert','imageAspect','imageAutoLoad','imageAutoGammaOn'].forEach(function(id){
     var el = $(id);
     if (!el) return;
     el.addEventListener('input', function(){
@@ -3005,6 +3014,7 @@ function initImageUI(){
   });
   if ($('imageGenerate')) $('imageGenerate').addEventListener('click', generateImage);
   if ($('imageAuto')) $('imageAuto').addEventListener('click', function(){ autoContrastImage(true); });
+  if ($('imageAutoGamma')) $('imageAutoGamma').addEventListener('click', function(){ autoGammaImage(true); });
   if ($('imageToneReset')) $('imageToneReset').addEventListener('click', resetImageTone);
   if ($('imageClear')) $('imageClear').addEventListener('click', clearImage);
   updateImageModeUi();

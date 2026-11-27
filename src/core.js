@@ -2257,6 +2257,42 @@ function imageToneLUT(opts){
   return lut;
 }
 
+function autoImageLevels(gray){
+  if (!gray || !gray.length) return {black:0, white:255};
+  var hist = new Array(256);
+  for (var i = 0; i < 256; i++) hist[i] = 0;
+  for (var j = 0; j < gray.length; j++) hist[clamp(Math.round(gray[j]), 0, 255)]++;
+  var total = gray.length, lo = total * 0.02, hi = total * 0.98;
+  var acc = 0, black = 0;
+  for (var b = 0; b < 256; b++){ acc += hist[b]; if (acc >= lo){ black = b; break; } }
+  acc = 0;
+  var white = 255;
+  for (var w = 0; w < 256; w++){ acc += hist[w]; if (acc >= hi){ white = w; break; } }
+  if (white - black < 8){ black = 0; white = 255; }
+  return {black:black, white:white};
+}
+
+function autoImageGamma(gray, opts){
+  if (!gray || !gray.length) return 1;
+  var o = opts || {};
+  var target = clamp(numOr(o.target, 0.45), 0.15, 0.85);
+  var lut = imageToneLUT({
+    brightness: o.brightness, contrast: o.contrast, gamma: 1,
+    black: o.black !== undefined ? o.black : 0,
+    white: o.white !== undefined ? o.white : 255
+  });
+  var hist = new Array(256);
+  for (var i = 0; i < 256; i++) hist[i] = 0;
+  for (var j = 0; j < gray.length; j++) hist[clamp(Math.round(gray[j]), 0, 255)]++;
+  var sum = 0, total = gray.length;
+  for (var v = 0; v < 256; v++) sum += hist[v] * lut[v];
+  if (!total) return 1;
+  var mean = sum / total / 255;
+  if (mean <= 0.03 || mean >= 0.97) return 1;
+  var g = Math.log(mean) / Math.log(target);
+  return Math.round(clamp(g, 0.25, 2.5) * 100) / 100;
+}
+
 function imageToMoves(gray, srcW, srcH, opts){
   var o = {
     width: 50, height: 30, mode: 'dots', res: 2, lineStep: 0.5,

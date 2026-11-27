@@ -289,6 +289,21 @@ test('картинка: яркость, контраст, гамма и уров
   const bright = C.imageToMoves(black, 2, 2, { width:2, height:2, res:1, mode:'dots', brightness:100, depth:-0.5 });
   assert.equal(bright.dots, 0);
 });
+test('картинка: авто-уровни и авто-гамма', () => {
+  const gray = [];
+  for (let i = 0; i < 100; i++) gray.push(100);
+  for (let i = 0; i < 100; i++) gray.push(150);
+  const lv = C.autoImageLevels(gray);
+  assert.equal(lv.black, 100);
+  assert.equal(lv.white, 150);
+  const g = C.autoImageGamma(gray, lv);
+  assert.ok(g < 1 && g >= 0.25, 'gamma=' + g);
+  const bright = C.autoImageGamma(new Array(100).fill(220), {black:0, white:255});
+  assert.ok(bright < g, 'bright gamma=' + bright);
+  const dark = C.autoImageGamma(new Array(100).fill(40), {black:0, white:255});
+  assert.ok(dark > 1, 'dark gamma=' + dark);
+  assert.equal(C.autoImageGamma([], {}), 1);
+});
 test('импорт кода без M30 — ошибка в чек-листе', () => {
   const v = check('G21\nG90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\nM5\n');
   assert.equal(v.items.find(i => i.id === 'end').status, 'error');

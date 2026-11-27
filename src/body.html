@@ -108,6 +108,7 @@
             <div class="field"><label for="imageBlack">Чёрный уровень</label><input id="imageBlack" type="number" value="0" step="1" min="0" max="254"></div>
             <div class="field"><label for="imageWhite">Белый уровень</label><input id="imageWhite" type="number" value="255" step="1" min="1" max="255"></div>
             <div class="field check"><label for="imageAutoLoad"><input type="checkbox" id="imageAutoLoad" checked> Авто-контраст при загрузке</label></div>
+            <div class="field check"><label for="imageAutoGammaOn"><input type="checkbox" id="imageAutoGammaOn" checked> Авто-гамма после контраста</label></div>
             <div class="field">
               <label for="imageDither">Дизеринг</label>
               <select id="imageDither">
@@ -125,6 +126,7 @@
           <div class="toolbar end">
             <button class="btn" id="imageGenerate">Сгенерировать G-код</button>
             <button class="btn ghost" id="imageAuto">Авто-контраст</button>
+            <button class="btn ghost" id="imageAutoGamma">Авто-гамма</button>
             <button class="btn ghost" id="imageToneReset">Сбросить тон</button>
             <button class="btn ghost" id="imageClear">Очистить</button>
           </div>
