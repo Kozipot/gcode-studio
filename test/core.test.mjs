@@ -232,6 +232,17 @@ test('дуги: I/J и отклонение конца', () => {
   assert.ok(arc);
   assert.equal(st.arcIssues.length, 0);
 });
+test('полный круг G3 только с I/J (без X/Y) распознаётся', () => {
+  const st = C.parseProgram('G21 G90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG3 I-20 J0\nG3 I-10 J0\nG0 Z5\nM5\nM30\n');
+  const arcs = st.moves.filter(m => m.t === 'arc');
+  assert.equal(arcs.length, 2);
+  assert.ok(Math.abs(arcs[0].i + 20) < 1e-9);
+  assert.ok(Math.abs(arcs[1].i + 10) < 1e-9);
+  assert.ok(Math.abs(st.minCutZ + 1) < 1e-9);
+  const v = C.validateGcode('G21 G90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG3 I-20 J0\nG3 I-10 J0\nG0 Z5\nM5\nM30\n',
+    { minZ:-25, blank:{ enabled:false }, safeZ:5, toolD:3 });
+  assert.equal(v.errors, 0, JSON.stringify(v.items.filter(i => i.status === 'error')));
+});
 test('импорт кода без M30 — ошибка в чек-листе', () => {
   const v = check('G21\nG90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\nM5\n');
   assert.equal(v.items.find(i => i.id === 'end').status, 'error');
@@ -244,6 +255,17 @@ test('макрос: #переменные и WHILE раскрываются дл
   assert.ok(Math.abs(st.minCutZ + 10) < 1e-6, 'minCutZ=' + st.minCutZ);
   const est = C.estimateMoves(st.moves, 100, 100);
   assert.ok(est.totalSec > 60, 'время: ' + est.totalSec);
+  const v = C.validateGcode(code, { minZ:-25, blank:{ enabled:false }, safeZ:5, toolD:3 });
+  assert.equal(v.errors, 0, JSON.stringify(v.items.filter(i => i.status === 'error')));
+});
+test('issue #1: две программы, полные круги G3 I/J и внутренние круги видны', () => {
+  const code = fs.readFileSync(new URL('./fixtures/issue1.nc', import.meta.url), 'utf8');
+  const st = C.parseProgram(code);
+  const arcs = st.moves.filter(m => m.t === 'arc');
+  assert.ok(st.moves.length > 900, 'движений: ' + st.moves.length);
+  assert.ok(arcs.length > 300, 'дуг: ' + arcs.length);
+  assert.equal(st.arcIssues.length, 0);
+  assert.ok(Math.abs(st.minCutZ + 11) < 1e-6, 'minCutZ=' + st.minCutZ);
   const v = C.validateGcode(code, { minZ:-25, blank:{ enabled:false }, safeZ:5, toolD:3 });
   assert.equal(v.errors, 0, JSON.stringify(v.items.filter(i => i.status === 'error')));
 });

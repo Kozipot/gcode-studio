@@ -231,6 +231,16 @@ test('макрос: предпросмотр не пустой', () => qa('#prev
 test('макрос: время посчитано', () => F('statsBox').textContent.includes('мин') || F('statsBox').textContent);
 test('макрос: информация о раскрытии', () => F('importInfo').textContent.includes('раскрыта'));
 test('макрос: чек-лист чистый', () => errors() === 0 || 'ошибок ' + errors());
+const issueCode = fs.readFileSync(path.join(ROOT, 'test/fixtures/issue1.nc'), 'utf8');
+F('importCode').value = issueCode;
+click('#importBtn');
+await sleep(500);
+test('issue #1: предпросмотр с внутренними кругами', () => {
+  const lines = qa('#preview line, #preview polyline').length;
+  return lines > 20 || 'линий ' + lines;
+});
+test('issue #1: время посчитано', () => F('statsBox').textContent.includes('мин') || F('statsBox').textContent);
+test('issue #1: чек-лист чистый', () => errors() === 0 || 'ошибок ' + errors());
 
 console.log('\n— Гравировка и кириллица —');
 tab('engrave');

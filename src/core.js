@@ -1908,6 +1908,10 @@ function parseProgram(text){
     var nx = axis('X'), ny = axis('Y'), nz = axis('Z');
     var hasAxis = (nx !== null || ny !== null || nz !== null);
     var hasCycleWord = (W.R !== undefined || W.Q !== undefined || W.P !== undefined);
+    /* Полный круг G2/G3 может быть задан только через I/J без X/Y:
+       G3 I-20 J0 — начальная и конечная точка совпадают. */
+    var arcOnly = !hasAxis && (st.motion === 'G2' || st.motion === 'G3') &&
+      (W.I !== undefined || W.J !== undefined);
 
     if (st.cycle){
       if (W.R !== undefined || W.Q !== undefined || W.P !== undefined){
@@ -1950,7 +1954,7 @@ function parseProgram(text){
       }
       continue;
     }
-    if (!hasAxis) continue;
+    if (!hasAxis && !arcOnly) continue;
     var tx = (nx !== null) ? (st.abs ? nx : cur.x + nx) : cur.x;
     var ty = (ny !== null) ? (st.abs ? ny : cur.y + ny) : cur.y;
     var tz = (nz !== null) ? (st.abs ? nz : cur.z + nz) : cur.z;
