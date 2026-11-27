@@ -126,6 +126,12 @@ var TIPS = {
   imageRes: 'Сколько точек на миллиметр по ширине. Больше — детальнее, но длиннее G-код и дольше обработка.',
   imageLineStep: 'Расстояние между строками для режима «Строками». Меньше — чище картинка, но больше проходов.',
   imageThreshold: 'Порог яркости 0–255: пиксели темнее порога гравируются. Для светлой картинки поможет инверсия.',
+  imageBrightness: 'Яркость: −100 — темнее, +100 — светлее. Если картинка почти не видна, начните с авто-контраста.',
+  imageContrast: 'Контраст: −100 — мягче, +100 — резче. Помогает разделить близкие оттенки.',
+  imageGamma: 'Гамма: больше 1 осветляет полутона, меньше 1 делает их темнее. 1 — без изменений.',
+  imageBlack: 'Чёрный уровень: всё темнее этого значения станет чёрным. Убирает серый фон.',
+  imageWhite: 'Белый уровень: всё светлее этого значения станет белым. Растягивает диапазон яркости.',
+  imageAutoLoad: 'При загрузке автоматически растянуть уровни по гистограмме: 2% самых тёмных станут чёрными, 2% самых светлых — белыми.',
   imageDither: 'Floyd–Steinberg или Atkinson распределяют ошибку яркости — лучше передают полутона точками. «Нет» — простой порог.',
   imageInvert: 'Инвертировать: гравировать светлые участки вместо тёмных.',
   imageDepth: 'Глубина Z за один проход. Обычно -0,2…-1 мм для гравировки.',
@@ -334,6 +340,7 @@ var PROJECT_FIELDS = ['engrMode','engrKind','engrText','calcExpr','engrSize','en
   'wcs','arcMode','decimals','useM6','toolNum','customHeader','customFooter','percent','lineNumbers',
   'returnHome','useTools',
   'imageMode','imageWidth','imageHeight','imageAspect','imageRes','imageLineStep','imageThreshold',
+  'imageBrightness','imageContrast','imageGamma','imageBlack','imageWhite','imageAutoLoad',
   'imageDither','imageInvert','imageDepth','imageFeed','imagePlunge','imageSafeZ'];
 var STORAGE_KEY = 'gcodeStudio.project.v1';
 var store = null;
@@ -2745,6 +2752,11 @@ function readImageOptions(){
     res: num('imageRes'),
     lineStep: num('imageLineStep'),
     threshold: num('imageThreshold'),
+    brightness: num('imageBrightness'),
+    contrast: num('imageContrast'),
+    gamma: num('imageGamma'),
+    black: num('imageBlack'),
+    white: num('imageWhite'),
     dither: $('imageDither').value,
     invert: !!($('imageInvert') && $('imageInvert').checked),
     depth: num('imageDepth'),
@@ -2777,7 +2789,60 @@ function drawImageSource(){
   var img = state.image.canvas;
   var sc = Math.min(cv.width / img.width, cv.height / img.height);
   var w = img.width * sc, h = img.height * sc;
-  ctx.drawImage(img, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+  var ox = (cv.width - w) / 2, oy = (cv.height - h) / 2;
+  var dw = Math.max(1, Math.round(w)), dh = Math.max(1, Math.round(h));
+  var tmp = document.createElement('canvas');
+  tmp.width = dw; tmp.height = dh;
+  var tctx = tmp.getContext ? tmp.getContext('2d') : null;
+  if (tctx && tctx.createImageData && tctx.putImageData){
+    var o = readImageOptions();
+    var lut = imageToneLUT(o);
+    var im = tctx.createImageData(dw, dh);
+    for (var py = 0; py < dh; py++){
+      var sy = clampNum(Math.floor(py * img.height / dh), 0, img.height - 1);
+      for (var px = 0; px < dw; px++){
+        var sx = clampNum(Math.floor(px * img.width / dw), 0, img.width - 1);
+        var v = lut[state.image.gray[sy * img.width + sx]];
+        if (o.invert) v = 255 - v;
+        var p = (py * dw + px) * 4;
+        im.data[p] = v; im.data[p+1] = v; im.data[p+2] = v; im.data[p+3] = 255;
+      }
+    }
+    tctx.putImageData(im, 0, 0);
+    ctx.drawImage(tmp, ox, oy);
+  } else {
+    ctx.drawImage(img, ox, oy, w, h);
+  }
+}
+
+function autoContrastImage(notify){
+  if (!state.image){ setImageInfo('⚠ Сначала загрузите PNG/JPEG.'); return; }
+  var gray = state.image.gray;
+  var hist = new Array(256).fill(0);
+  for (var i = 0; i < gray.length; i++) hist[clampNum(Math.round(gray[i]), 0, 255)]++;
+  var total = gray.length, lo = total * 0.02, hi = total * 0.98;
+  var acc = 0, black = 0;
+  for (var b = 0; b < 256; b++){ acc += hist[b]; if (acc >= lo){ black = b; break; } }
+  acc = 0;
+  var white = 255;
+  for (var w = 0; w < 256; w++){ acc += hist[w]; if (acc >= hi){ white = w; break; } }
+  if (white - black < 8){ black = 0; white = 255; }
+  $('imageBlack').value = black;
+  $('imageWhite').value = white;
+  drawImageSource();
+  generateImage();
+  if (notify !== false) showToast('Авто-контраст: уровни ' + black + '…' + white);
+}
+
+function resetImageTone(){
+  if ($('imageBrightness')) $('imageBrightness').value = 0;
+  if ($('imageContrast')) $('imageContrast').value = 0;
+  if ($('imageGamma')) $('imageGamma').value = 1;
+  if ($('imageBlack')) $('imageBlack').value = 0;
+  if ($('imageWhite')) $('imageWhite').value = 255;
+  drawImageSource();
+  if (state.image) generateImage();
+  showToast('Тон сброшен');
 }
 
 function setImageInfo(text){
@@ -2826,7 +2891,8 @@ function loadImageFile(file){
       $('imageEmpty').classList.add('hidden');
       drawImageSource();
       $('imageNote').textContent = 'Загружено: ' + file.name + ' · ' + cw + '×' + ch + ' px. Файл не сохраняется в проект, только настройки.';
-      generateImage();
+      if ($('imageAutoLoad') && $('imageAutoLoad').checked) autoContrastImage(false);
+      else generateImage();
     };
     img.onerror = function(){ setImageInfo('⚠ Не удалось прочитать изображение.'); };
     img.src = reader.result;
@@ -2837,6 +2903,7 @@ function loadImageFile(file){
 
 function scheduleImageGenerate(){
   if (state.tab !== 'image' || !state.image) return;
+  drawImageSource();
   clearTimeout(state.imageTimer);
   state.imageTimer = setTimeout(generateImage, 380);
 }
@@ -2919,13 +2986,13 @@ function initImageUI(){
       scheduleHistory();
     });
   });
-  ['imageRes','imageLineStep','imageThreshold','imageDepth','imageFeed','imagePlunge','imageSafeZ'].forEach(function(id){
+  ['imageRes','imageLineStep','imageThreshold','imageBrightness','imageContrast','imageGamma','imageBlack','imageWhite','imageDepth','imageFeed','imagePlunge','imageSafeZ'].forEach(function(id){
     var el = $(id);
     if (!el) return;
     el.addEventListener('input', function(){ scheduleImageGenerate(); scheduleHistory(); });
     el.addEventListener('change', function(){ scheduleImageGenerate(); scheduleHistory(); });
   });
-  ['imageDither','imageInvert','imageAspect'].forEach(function(id){
+  ['imageDither','imageInvert','imageAspect','imageAutoLoad'].forEach(function(id){
     var el = $(id);
     if (!el) return;
     el.addEventListener('input', function(){
@@ -2937,6 +3004,8 @@ function initImageUI(){
     el.addEventListener('change', function(){ scheduleImageGenerate(); scheduleHistory(); });
   });
   if ($('imageGenerate')) $('imageGenerate').addEventListener('click', generateImage);
+  if ($('imageAuto')) $('imageAuto').addEventListener('click', function(){ autoContrastImage(true); });
+  if ($('imageToneReset')) $('imageToneReset').addEventListener('click', resetImageTone);
   if ($('imageClear')) $('imageClear').addEventListener('click', clearImage);
   updateImageModeUi();
   drawImageSource();

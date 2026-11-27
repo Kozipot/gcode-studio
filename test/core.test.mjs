@@ -275,6 +275,20 @@ test('картинка: точки, строки, инверсия и грани
   assert.ok(dith.dots > 0 && dith.dots < 16);
   assert.ok(dith.moves.every(m => m.x >= 0 && m.x <= 4 && m.y >= 0 && m.y <= 4));
 });
+test('картинка: яркость, контраст, гамма и уровни', () => {
+  const lut = C.imageToneLUT({brightness:100});
+  assert.ok(lut[0] > 0 && lut[255] === 255);
+  const con = C.imageToneLUT({contrast:100});
+  assert.ok(con[0] === 0 && con[255] === 255 && con[100] < 100);
+  const levels = C.imageToneLUT({black:50, white:200});
+  assert.equal(levels[50], 0);
+  assert.equal(levels[200], 255);
+  const gamma = C.imageToneLUT({gamma:2});
+  assert.ok(gamma[128] > 128);
+  const black = new Array(4).fill(0);
+  const bright = C.imageToMoves(black, 2, 2, { width:2, height:2, res:1, mode:'dots', brightness:100, depth:-0.5 });
+  assert.equal(bright.dots, 0);
+});
 test('импорт кода без M30 — ошибка в чек-листе', () => {
   const v = check('G21\nG90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\nM5\n');
   assert.equal(v.items.find(i => i.id === 'end').status, 'error');

@@ -102,6 +102,12 @@
             <div class="field"><label for="imageRes">Точек/мм</label><input id="imageRes" type="number" value="2" step="0.5" min="0.2" max="20"></div>
             <div class="field"><label for="imageLineStep">Шаг строк, мм</label><input id="imageLineStep" type="number" value="0.5" step="0.1" min="0.05"></div>
             <div class="field"><label for="imageThreshold">Порог 0–255</label><input id="imageThreshold" type="number" value="128" step="1" min="0" max="255"></div>
+            <div class="field"><label for="imageBrightness">Яркость −100…100</label><input id="imageBrightness" type="number" value="0" step="5" min="-100" max="100"></div>
+            <div class="field"><label for="imageContrast">Контраст −100…100</label><input id="imageContrast" type="number" value="0" step="5" min="-100" max="100"></div>
+            <div class="field"><label for="imageGamma">Гамма 0,2–3</label><input id="imageGamma" type="number" value="1" step="0.1" min="0.2" max="3"></div>
+            <div class="field"><label for="imageBlack">Чёрный уровень</label><input id="imageBlack" type="number" value="0" step="1" min="0" max="254"></div>
+            <div class="field"><label for="imageWhite">Белый уровень</label><input id="imageWhite" type="number" value="255" step="1" min="1" max="255"></div>
+            <div class="field check"><label for="imageAutoLoad"><input type="checkbox" id="imageAutoLoad" checked> Авто-контраст при загрузке</label></div>
             <div class="field">
               <label for="imageDither">Дизеринг</label>
               <select id="imageDither">
@@ -118,6 +124,8 @@
           </div>
           <div class="toolbar end">
             <button class="btn" id="imageGenerate">Сгенерировать G-код</button>
+            <button class="btn ghost" id="imageAuto">Авто-контраст</button>
+            <button class="btn ghost" id="imageToneReset">Сбросить тон</button>
             <button class="btn ghost" id="imageClear">Очистить</button>
           </div>
           <pre class="out" id="imageInfo">— загрузите PNG/JPEG —</pre>

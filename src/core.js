@@ -2236,10 +2236,32 @@ function solveFullCircle(sx, sy, cx, cy, dir){
   };
 }
 
+function imageToneLUT(opts){
+  var o = opts || {};
+  var bright = clamp(numOr(o.brightness, 0), -100, 100) * 2.55;
+  var contrast = clamp(numOr(o.contrast, 0), -100, 100);
+  var c = clamp(contrast * 2.55, -255, 255);
+  var factor = (259 * (c + 255)) / (255 * (259 - c));
+  var gamma = clamp(numOr(o.gamma, 1), 0.2, 3);
+  var black = clamp(numOr(o.black, 0), 0, 255);
+  var white = clamp(numOr(o.white, 255), 1, 255);
+  if (white <= black + 1) white = Math.min(255, black + 1);
+  var lut = new Array(256);
+  for (var i = 0; i < 256; i++){
+    var v = (i - black) * 255 / (white - black);
+    v = clamp(v, 0, 255);
+    v = 255 * Math.pow(v / 255, 1 / gamma);
+    v = (v - 128) * factor + 128 + bright;
+    lut[i] = clamp(Math.round(v), 0, 255);
+  }
+  return lut;
+}
+
 function imageToMoves(gray, srcW, srcH, opts){
   var o = {
     width: 50, height: 30, mode: 'dots', res: 2, lineStep: 0.5,
     threshold: 128, dither: 'none', invert: false,
+    brightness: 0, contrast: 0, gamma: 1, black: 0, white: 255,
     depth: -0.5, feed: 800, plunge: 200, safeZ: 5
   };
   if (opts) for (var k in opts) if (opts[k] !== undefined && opts[k] !== null) o[k] = opts[k];
@@ -2272,6 +2294,7 @@ function imageToMoves(gray, srcW, srcH, opts){
   }
   var cells = nx * ny;
   if (cells > 250000) warnings.push('Слишком много ячеек (' + cells + ') — генерация может быть медленной.');
+  var lut = imageToneLUT(o);
   var vals = new Array(cells);
   for (var y = 0; y < ny; y++){
     for (var x = 0; x < nx; x++){
@@ -2280,6 +2303,7 @@ function imageToMoves(gray, srcW, srcH, opts){
       var gy = clamp(Math.floor(v * srcH), 0, srcH - 1);
       var val = Number(src[gy * srcW + gx]);
       if (!isFinite(val)) val = 255;
+      val = lut[clamp(Math.round(val), 0, 255)];
       if (o.invert) val = 255 - val;
       vals[y * nx + x] = val;
     }
@@ -2348,6 +2372,8 @@ function imageToMoves(gray, srcW, srcH, opts){
   return {
     moves: moves, dots: dots, runs: runs, cells: cells, gridW: nx, gridH: ny,
     width: width, height: height, depth: depth, feed: feed, plunge: plunge, safeZ: safeZ,
+    brightness: numOr(o.brightness, 0), contrast: numOr(o.contrast, 0), gamma: numOr(o.gamma, 1),
+    black: numOr(o.black, 0), white: numOr(o.white, 255),
     mode: mode, blank: {enabled:true, w:width, h:height, thickness:5}, warnings: warnings
   };
 }
