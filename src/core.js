@@ -1762,6 +1762,11 @@ function expandMacros(text){
   var lines = src.split('\n').map(stripComments);
   var vars = {};
   var guard = 0;
+  function findLabel(start, end, tag){
+    var re = new RegExp('^N' + tag + '\\b', 'i');
+    for (var j = start; j < end; j++){ if (re.test(lines[j])) return j; }
+    return -1;
+  }
   function runBlock(start, end){
     var out = [];
     var i = start;
@@ -1780,6 +1785,34 @@ function expandMacros(text){
         i = endIdx + 1;
         continue;
       }
+      var ifm = /^IF\s*\[/i.exec(line);
+      if (ifm){
+        var ibr = readBracket(line, ifm[0].length - 1);
+        var cond = paramEval(ibr.body, vars).value !== 0;
+        var rest = line.slice(ibr.end + 1).trim();
+        if (cond){
+          var thenm = /^THEN\s+#(\d+)\s*=\s*(.+)$/i.exec(rest);
+          if (thenm){
+            vars[Number(thenm[1])] = paramEval(thenm[2], vars).value;
+            i++;
+            continue;
+          }
+          var igoto = /^GOTO\s+(\d+)/i.exec(rest);
+          if (igoto){
+            var itarget = findLabel(start, end, igoto[1]);
+            if (itarget >= 0){ i = itarget + 1; continue; }
+          }
+        }
+        i++;
+        continue;
+      }
+      var gotom = /^GOTO\s+(\d+)/i.exec(line);
+      if (gotom){
+        var gtarget = findLabel(start, end, gotom[1]);
+        if (gtarget >= 0){ i = gtarget + 1; continue; }
+        i++;
+        continue;
+      }
       var asg = /^#(\d+)\s*=\s*(.+)$/.exec(line);
       if (asg){
         vars[Number(asg[1])] = paramEval(asg[2], vars).value;
@@ -1787,7 +1820,7 @@ function expandMacros(text){
         continue;
       }
       if (/^(END|DO)\s*\d+/i.test(line)){ i++; continue; }
-      if (/^(IF|GOTO|N\d+)/i.test(line)){ i++; continue; }
+      if (/^N\d+/i.test(line)){ i++; continue; }
       var ex = expandLine(line, vars);
       if (ex) out.push(ex);
       i++;

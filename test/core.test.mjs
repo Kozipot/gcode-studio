@@ -269,6 +269,30 @@ test('issue #1: две программы, полные круги G3 I/J и в�
   const v = C.validateGcode(code, { minZ:-25, blank:{ enabled:false }, safeZ:5, toolD:3 });
   assert.equal(v.errors, 0, JSON.stringify(v.items.filter(i => i.status === 'error')));
 });
+test('макрос: IF/THEN и IF/GOTO с меткой N', () => {
+  const code = `G21 G90
+M3 S1000
+G0 X0 Y0 Z5
+G1 Z-1 F100
+#1 = 0
+WHILE [#1 LT 3] DO1
+  #1 = [#1 + 1]
+  IF [#1 EQ 2] GOTO 10
+  G1 X#1 F100
+  N10
+END1
+#2 = 10
+IF [#2 GT 5] THEN #2 = 5
+G1 X#2
+M5
+M30`;
+  const st = C.parseProgram(code);
+  const xs = st.moves.filter(m => m.t === 'line' && m.z < 0).map(m => Math.round(m.x * 100) / 100);
+  assert.ok(xs.includes(1), 'X1: ' + xs.join(','));
+  assert.ok(xs.includes(3), 'X3: ' + xs.join(','));
+  assert.ok(!xs.includes(2), 'X2 не должен резаться: ' + xs.join(','));
+  assert.ok(xs.includes(5), 'IF/THEN clamp X5: ' + xs.join(','));
+});
 
 console.log('\n— Резьба / сверление / расточка —');
 test('G84: F = P × S, сверло = D − P', () => {
