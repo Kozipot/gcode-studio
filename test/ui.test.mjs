@@ -267,8 +267,19 @@ test('обратная гравировка: чек-лист чистый', () =
 test('обратная гравировка: растр', () => (output().match(/G1 X/g) || []).length > 30);
 test('нет ошибок в консоли', () => (ctx.window.__errs || []).length === 0 || (ctx.window.__errs || []).join(' | '));
 
+console.log('\n— Картинка —');
+tab('image');
+await sleep(250);
+test('вкладка «Картинка» открыта', () => q('#tab-image').classList.contains('active'));
+test('картинка: поля загрузки и настроек', () => !!F('imageFile') && !!F('imageMode') && !!F('imageWidth') && !!F('imageGenerate'));
+test('картинка: пустое состояние', () => F('imageInfo').textContent.includes('загрузите'));
+test('картинка: шаг строк выключен для точек', () => F('imageLineStep').disabled === true);
+setVal('imageMode', 'lines');
+await sleep(250);
+test('картинка: шаг строк включается для строк', () => F('imageLineStep').disabled === false);
+
 console.log('\n— Шпаргалки —');
-test('семь вкладок в шапке', () => qa('.tab').length === 7 || 'вкладок ' + qa('.tab').length);
+test('восемь вкладок в шапке', () => qa('.tab').length === 8 || 'вкладок ' + qa('.tab').length);
 tab('ref');
 test('вкладка «Шпаргалки» открыта', () => q('#tab-ref').classList.contains('active'));
 test('активная кнопка — «Шпаргалки»', () => q('.tab.active').dataset.tab === 'ref');

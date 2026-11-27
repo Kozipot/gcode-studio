@@ -255,6 +255,26 @@ test('калькулятор: полный круг из текущей точк
   const bad = C.solveFullCircle(10, 0, 10, 0, 'G3');
   assert.ok(bad.error);
 });
+test('картинка: точки, строки, инверсия и границы', () => {
+  const black = new Array(16).fill(0);
+  const dots = C.imageToMoves(black, 4, 4, { width:4, height:4, res:1, mode:'dots', depth:-0.5 });
+  assert.equal(dots.dots, 16);
+  assert.equal(dots.moves.length, 48);
+  assert.equal(dots.gridW, 4);
+  assert.equal(dots.gridH, 4);
+  const lines = C.imageToMoves(black, 4, 4, { width:4, height:4, res:1, lineStep:1, mode:'lines', depth:-0.5 });
+  assert.equal(lines.runs, 4);
+  assert.equal(lines.moves.length, 16);
+  assert.equal(lines.blank.w, 4);
+  const inv = C.imageToMoves(black, 4, 4, { width:4, height:4, res:1, mode:'dots', invert:true, depth:-0.5 });
+  assert.equal(inv.dots, 0);
+  assert.ok(inv.warnings.length > 0);
+  const grad = [];
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) grad.push(x * 64 + y * 16);
+  const dith = C.imageToMoves(grad, 4, 4, { width:4, height:4, res:1, mode:'dots', dither:'floyd', threshold:128, depth:-0.5 });
+  assert.ok(dith.dots > 0 && dith.dots < 16);
+  assert.ok(dith.moves.every(m => m.x >= 0 && m.x <= 4 && m.y >= 0 && m.y <= 4));
+});
 test('импорт кода без M30 — ошибка в чек-листе', () => {
   const v = check('G21\nG90\nM3 S1000\nG0 X0 Y0 Z5\nG1 Z-1 F100\nG0 Z5\nM5\n');
   assert.equal(v.items.find(i => i.id === 'end').status, 'error');

@@ -118,6 +118,20 @@ var TIPS = {
   arcEy: 'Y конца дуги.',
   arcR: 'Радиус дуги. Пусто — половина хорды, то есть полуокружность.',
   arcDir: 'G3 — против часовой стрелки, G2 — по часовой.',
+  imageFile: 'PNG или JPEG. Файл читается локально в браузере и не отправляется на сервер; в проект сохраняются только настройки.',
+  imageMode: '«Точками» — отдельные точки-врезания по сетке. «Строками» — растровые проходы по строкам, как на гравировальном станке.',
+  imageWidth: 'Ширина картинки в миллиметрах. Высота пересчитывается по пропорциям, если включена галочка.',
+  imageHeight: 'Высота картинки в миллиметрах. При сохранении пропорций меняется вместе с шириной.',
+  imageAspect: 'Сохранять пропорции исходной картинки: ширина и высота пересчитываются автоматически.',
+  imageRes: 'Сколько точек на миллиметр по ширине. Больше — детальнее, но длиннее G-код и дольше обработка.',
+  imageLineStep: 'Расстояние между строками для режима «Строками». Меньше — чище картинка, но больше проходов.',
+  imageThreshold: 'Порог яркости 0–255: пиксели темнее порога гравируются. Для светлой картинки поможет инверсия.',
+  imageDither: 'Floyd–Steinberg или Atkinson распределяют ошибку яркости — лучше передают полутона точками. «Нет» — простой порог.',
+  imageInvert: 'Инвертировать: гравировать светлые участки вместо тёмных.',
+  imageDepth: 'Глубина Z за один проход. Обычно -0,2…-1 мм для гравировки.',
+  imageFeed: 'Рабочая подача по XY для строк и точек, мм/мин.',
+  imagePlunge: 'Подача вертикального врезания, мм/мин.',
+  imageSafeZ: 'Безопасная высота подъёма между точками и строками, мм.',
   paramExpr: 'Выражение Macro B: #переменные, + − * / ^ MOD, функции SIN/COS/TAN/ATAN/ABS/SQRT/ROUND/FIX/FUP/LN/EXP, сравнения EQ/NE/GT/LT/GE/LE и логика AND/OR/XOR. Углы в градусах.',
   paramMode: 'Готовый параметрический шаблон: отверстия по окружности, сетка, рамка с проходами или окружность по точкам.',
   paramView: 'Параметрическая версия содержит #переменные и WHILE для Fanuc/Haas/LinuxCNC. Числовая — готовые координаты, её можно проверить и скачать. GRBL макросы не поддерживает.',
@@ -209,6 +223,9 @@ var state = {
   cam3d: { yaw: -Math.PI / 4, pitch: Math.PI / 7, zoom: 1, panX: 0, panY: 0 },
   scene3d: null,
   lastPreview: { moves: [], options: {} },
+  image: null,
+  imageTimer: null,
+  lastImage: null,
   tools: [{no:1, name:'Фреза Ø3', d:3, flutes:2, s:12000, f:800, fz:200}]
 };
 
@@ -315,7 +332,9 @@ var PROJECT_FIELDS = ['engrMode','engrKind','engrText','calcExpr','engrSize','en
   'spindle','feed','plungeFeed','depth','depthPass','safeZ','x0','y0','toolDiam','stepover','ramp',
   'minZ','controller','coolant','asciiComments','optimize','arrCols','arrRows','arrDx','arrDy',
   'wcs','arcMode','decimals','useM6','toolNum','customHeader','customFooter','percent','lineNumbers',
-  'returnHome','useTools'];
+  'returnHome','useTools',
+  'imageMode','imageWidth','imageHeight','imageAspect','imageRes','imageLineStep','imageThreshold',
+  'imageDither','imageInvert','imageDepth','imageFeed','imagePlunge','imageSafeZ'];
 var STORAGE_KEY = 'gcodeStudio.project.v1';
 var store = null;
 try { store = window.localStorage; } catch (e){ store = null; }
@@ -531,6 +550,7 @@ function initHistory(){
 
 function generate(){
   if (state.tab === 'threads' || state.tab === 'import') return;
+  if (state.tab === 'image'){ if (state.image) generateImage(); return; }
   var p = readParams();
   var scene, owner, title;
   if (state.tab === 'engrave'){
@@ -586,13 +606,17 @@ function present(code, o){
   var toolD = o.toolD || p.toolD;
   var moves = o.moves;
   if (!moves){ moves = parseProgram(code).moves; }
-  var est = estimateMoves(moves, p.F, p.Fz);
+  var feed = o.feed !== undefined ? o.feed : p.F;
+  var plunge = o.plunge !== undefined ? o.plunge : p.Fz;
+  var safeZ = o.safeZ !== undefined ? o.safeZ : p.safeZ;
+  var minZ = o.minZ !== undefined ? o.minZ : p.minZ;
+  var est = estimateMoves(moves, feed, plunge);
   drawPreview(moves, { blank: o.blank, groups: o.groups, holes: o.holes });
-  var extraChecks = o.scene ? sceneChecks(o.scene, { toolD: toolD, depth: p.depth, minZ: p.minZ }) : [];
+  var extraChecks = o.scene ? sceneChecks(o.scene, { toolD: toolD, depth: p.depth, minZ: minZ }) : [];
   var res = validateGcode(code, {
-    minZ: p.minZ,
+    minZ: minZ,
     blank: o.blank || {enabled:false},
-    safeZ: p.safeZ,
+    safeZ: safeZ,
     toolD: toolD,
     controller: p.controller,
     estSec: est.totalSec,
@@ -2712,6 +2736,212 @@ function onSceneFieldChange(e, isChange){
   scheduleHistory();
 }
 
+/* ---------------------------------------------------------------- картинка */
+function readImageOptions(){
+  return {
+    mode: $('imageMode').value === 'lines' ? 'lines' : 'dots',
+    width: num('imageWidth'),
+    height: num('imageHeight'),
+    res: num('imageRes'),
+    lineStep: num('imageLineStep'),
+    threshold: num('imageThreshold'),
+    dither: $('imageDither').value,
+    invert: !!($('imageInvert') && $('imageInvert').checked),
+    depth: num('imageDepth'),
+    feed: num('imageFeed'),
+    plunge: num('imagePlunge'),
+    safeZ: num('imageSafeZ')
+  };
+}
+
+function updateImageModeUi(){
+  var lines = $('imageMode') && $('imageMode').value === 'lines';
+  if ($('imageLineStep')) $('imageLineStep').disabled = !lines;
+}
+
+function drawImageSource(){
+  var cv = $('imagePreview');
+  if (!cv) return;
+  var empty = $('imageEmpty');
+  if (!state.image){
+    if (empty) empty.classList.remove('hidden');
+    var ctx0 = cv.getContext ? cv.getContext('2d') : null;
+    if (ctx0){ ctx0.fillStyle = '#0a0a0d'; ctx0.fillRect(0, 0, cv.width, cv.height); }
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+  var ctx = cv.getContext ? cv.getContext('2d') : null;
+  if (!ctx) return;
+  ctx.fillStyle = '#0a0a0d';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  var img = state.image.canvas;
+  var sc = Math.min(cv.width / img.width, cv.height / img.height);
+  var w = img.width * sc, h = img.height * sc;
+  ctx.drawImage(img, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+}
+
+function setImageInfo(text){
+  var el = $('imageInfo');
+  if (el) el.textContent = text;
+}
+
+function loadImageFile(file){
+  if (!file) return;
+  if (!/^image\/(png|jpeg|webp)$/i.test(file.type || '') && !/\.(png|jpe?g|webp)$/i.test(file.name || '')){
+    setImageInfo('⚠ Поддерживаются PNG, JPEG и WebP.');
+    showToast('Нужен PNG или JPEG');
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024){
+    setImageInfo('⚠ Файл больше 12 МБ — обработка может занять время.');
+  }
+  var reader = new (window.FileReader || FileReader)();
+  reader.onload = function(){
+    var img = new Image();
+    img.onload = function(){
+      var maxSide = 1200;
+      var scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      var cw = Math.max(1, Math.round(img.width * scale));
+      var ch = Math.max(1, Math.round(img.height * scale));
+      var c = document.createElement('canvas');
+      c.width = cw; c.height = ch;
+      var cx = c.getContext ? c.getContext('2d') : null;
+      if (!cx){
+        setImageInfo('⚠ Браузер не поддерживает canvas для чтения картинки.');
+        return;
+      }
+      cx.fillStyle = '#fff';
+      cx.fillRect(0, 0, cw, ch);
+      cx.drawImage(img, 0, 0, cw, ch);
+      var data = cx.getImageData(0, 0, cw, ch).data;
+      var gray = new Array(cw * ch);
+      for (var i = 0, p = 0; i < gray.length; i++, p += 4){
+        gray[i] = Math.round(0.299 * data[p] + 0.587 * data[p+1] + 0.114 * data[p+2]);
+      }
+      state.image = {name:file.name, w:cw, h:ch, gray:gray, canvas:c};
+      if ($('imageAspect') && $('imageAspect').checked){
+        var wmm = Math.max(1, num('imageWidth'));
+        $('imageHeight').value = fmt(wmm * ch / cw, 1);
+      }
+      $('imageEmpty').classList.add('hidden');
+      drawImageSource();
+      $('imageNote').textContent = 'Загружено: ' + file.name + ' · ' + cw + '×' + ch + ' px. Файл не сохраняется в проект, только настройки.';
+      generateImage();
+    };
+    img.onerror = function(){ setImageInfo('⚠ Не удалось прочитать изображение.'); };
+    img.src = reader.result;
+  };
+  reader.onerror = function(){ setImageInfo('⚠ Ошибка чтения файла.'); };
+  reader.readAsDataURL(file);
+}
+
+function scheduleImageGenerate(){
+  if (state.tab !== 'image' || !state.image) return;
+  clearTimeout(state.imageTimer);
+  state.imageTimer = setTimeout(generateImage, 380);
+}
+
+function generateImage(){
+  if (!state.image){ setImageInfo('— загрузите PNG/JPEG —'); return; }
+  var o = readImageOptions();
+  var res = imageToMoves(state.image.gray, state.image.w, state.image.h, o);
+  var p = readParams();
+  var meta = {
+    title: 'КАРТИНКА: ' + state.image.name,
+    controller: p.controller,
+    spindle: p.spindle,
+    safeZ: o.safeZ,
+    toolD: p.toolD,
+    blank: res.blank,
+    asciiComments: p.asciiComments,
+    coolant: p.coolant,
+    decimals: p.decimals,
+    arcMode: p.arcMode,
+    wcs: p.wcs,
+    useM6: p.useM6,
+    toolNumber: p.toolNum,
+    percent: p.percent,
+    lineNumbers: p.lineNumbers,
+    customHeader: p.customHeader,
+    customFooter: p.customFooter,
+    returnHome: p.returnHome
+  };
+  var gcode = emitProgram(res.moves, meta, {});
+  state.lastProgram = {gcode:gcode, moves:res.moves, warnings:res.warnings, meta:meta};
+  state.lastWarnings = res.warnings;
+  state.lastImage = res;
+  var out = present(gcode, {
+    moves: res.moves, blank: res.blank, owner: 'картинка', warnings: res.warnings,
+    toolD: p.toolD, feed: o.feed, plunge: o.plunge, safeZ: o.safeZ,
+    minZ: Math.min(0, o.depth) - 0.01
+  });
+  state.programSource = 'tab:image';
+  state.manualEdit = false;
+  var what = res.mode === 'dots' ? (res.dots + ' точек') : (res.runs + ' строк');
+  setImageInfo(
+    'Готово: ' + what + ' · сетка ' + res.gridW + '×' + res.gridH +
+    ' · ' + fmt(res.width, 1) + '×' + fmt(res.height, 1) + ' мм' +
+    ' · ' + formatTime(out.est.totalSec) +
+    (res.warnings.length ? '\n⚠ ' + res.warnings.join('\n⚠ ') : '')
+  );
+}
+
+function clearImage(){
+  state.image = null;
+  state.lastImage = null;
+  if ($('imageFile')) $('imageFile').value = '';
+  drawImageSource();
+  $('imageNote').textContent = 'Загрузите картинку. Файл обрабатывается локально в браузере и не сохраняется в проект — сохраняются только настройки.';
+  setImageInfo('— загрузите PNG/JPEG —');
+  clearOutput('картинка');
+}
+
+function initImageUI(){
+  var file = $('imageFile');
+  if (file) file.addEventListener('change', function(){ if (this.files && this.files[0]) loadImageFile(this.files[0]); });
+  if ($('imageMode')) $('imageMode').addEventListener('change', function(){
+    updateImageModeUi();
+    scheduleImageGenerate();
+    scheduleHistory();
+  });
+  ['imageWidth','imageHeight'].forEach(function(id){
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener('input', function(){
+      if ($('imageAspect') && $('imageAspect').checked && state.image){
+        if (id === 'imageWidth'){
+          $('imageHeight').value = fmt(Math.max(1, num('imageWidth')) * state.image.h / state.image.w, 1);
+        } else {
+          $('imageWidth').value = fmt(Math.max(1, num('imageHeight')) * state.image.w / state.image.h, 1);
+        }
+      }
+      scheduleImageGenerate();
+      scheduleHistory();
+    });
+  });
+  ['imageRes','imageLineStep','imageThreshold','imageDepth','imageFeed','imagePlunge','imageSafeZ'].forEach(function(id){
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener('input', function(){ scheduleImageGenerate(); scheduleHistory(); });
+    el.addEventListener('change', function(){ scheduleImageGenerate(); scheduleHistory(); });
+  });
+  ['imageDither','imageInvert','imageAspect'].forEach(function(id){
+    var el = $(id);
+    if (!el) return;
+    el.addEventListener('input', function(){
+      if (id === 'imageAspect' && el.checked && state.image){
+        $('imageHeight').value = fmt(Math.max(1, num('imageWidth')) * state.image.h / state.image.w, 1);
+      }
+      scheduleImageGenerate(); scheduleHistory();
+    });
+    el.addEventListener('change', function(){ scheduleImageGenerate(); scheduleHistory(); });
+  });
+  if ($('imageGenerate')) $('imageGenerate').addEventListener('click', generateImage);
+  if ($('imageClear')) $('imageClear').addEventListener('click', clearImage);
+  updateImageModeUi();
+  drawImageSource();
+}
+
 /* ---------------------------------------------------------------- вкладки */
 function switchTab(tab){
   state.tab = tab;
@@ -2721,13 +2951,20 @@ function switchTab(tab){
   var showCommon = common || tab === 'param';
   $('commonParams').style.display = showCommon ? 'block' : 'none';
   $('commonSep').style.display = showCommon ? 'block' : 'none';
-  $('extraTools').style.display = (tab === 'arc' || tab === 'ref' || tab === 'param') ? 'none' : 'block';
+  $('extraTools').style.display = (tab === 'arc' || tab === 'ref' || tab === 'param' || tab === 'image') ? 'none' : 'block';
   $('layout').classList.toggle('wide', tab === 'ref');
-  if (tab === 'arc' || tab === 'ref' || tab === 'param'){
+  if (tab === 'arc' || tab === 'ref' || tab === 'param' || tab === 'image'){
     if (typeof window.scrollTo === 'function') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   if (common) generate();
-  else if (tab === 'threads'){
+  else if (tab === 'image'){
+    updateImageModeUi();
+    if (state.image) generateImage();
+    else {
+      setImageInfo('— загрузите PNG/JPEG —');
+      drawImageSource();
+    }
+  } else if (tab === 'threads'){
     if (!state.thread[state.threadTab]) calcThread(state.threadTab);
     makeThreadProgram(state.threadTab, true);
   } else if (tab === 'import'){
@@ -2761,6 +2998,7 @@ function init(){
 
   renderReference();
   initThreadUI();
+  initImageUI();
 
   state.scene = defaultScene();
   syncBlankInputs();

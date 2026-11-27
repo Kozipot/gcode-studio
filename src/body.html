@@ -9,6 +9,7 @@
     </div>
     <nav class="tabs" id="tabs">
       <button class="tab active" data-tab="engrave">✍ Гравировка</button>
+      <button class="tab" data-tab="image">🖼 Картинка</button>
       <button class="tab" data-tab="scene">⬡ Конструктор</button>
       <button class="tab" data-tab="threads">🔩 Резьба / сверление</button>
       <button class="tab" data-tab="import">📥 Импорт / проверка</button>
@@ -68,6 +69,58 @@
             </div>
           </div>
           <div class="note" id="engrNote">Введите текст — предпросмотр и G-код обновятся автоматически.</div>
+        </div>
+
+        <!-- ==================== КАРТИНКА ==================== -->
+        <div class="tabpane" id="tab-image">
+          <div class="panel-head">
+            <h2><span class="em">🖼</span> Гравировка картинки</h2>
+            <span class="sub">PNG/JPEG · дизеринг · точки/строки</span>
+          </div>
+          <div class="fields">
+            <div class="field" style="grid-column:1/-1">
+              <label for="imageFile">Файл PNG / JPEG</label>
+              <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp">
+            </div>
+          </div>
+          <div class="note" id="imageNote">Загрузите картинку. Файл обрабатывается локально в браузере и не сохраняется в проект — сохраняются только настройки.</div>
+          <div class="image-source">
+            <canvas id="imagePreview" width="440" height="260"></canvas>
+            <div class="img-empty" id="imageEmpty">Нет изображения</div>
+          </div>
+          <div class="fields">
+            <div class="field">
+              <label for="imageMode">Режим</label>
+              <select id="imageMode">
+                <option value="dots">Точками</option>
+                <option value="lines">Строками</option>
+              </select>
+            </div>
+            <div class="field"><label for="imageWidth">Ширина, мм</label><input id="imageWidth" type="number" value="50" step="1" min="1"></div>
+            <div class="field"><label for="imageHeight">Высота, мм</label><input id="imageHeight" type="number" value="30" step="1" min="1"></div>
+            <div class="field check"><label for="imageAspect"><input type="checkbox" id="imageAspect" checked> Сохранять пропорции</label></div>
+            <div class="field"><label for="imageRes">Точек/мм</label><input id="imageRes" type="number" value="2" step="0.5" min="0.2" max="20"></div>
+            <div class="field"><label for="imageLineStep">Шаг строк, мм</label><input id="imageLineStep" type="number" value="0.5" step="0.1" min="0.05"></div>
+            <div class="field"><label for="imageThreshold">Порог 0–255</label><input id="imageThreshold" type="number" value="128" step="1" min="0" max="255"></div>
+            <div class="field">
+              <label for="imageDither">Дизеринг</label>
+              <select id="imageDither">
+                <option value="none">Нет (порог)</option>
+                <option value="floyd">Floyd–Steinberg</option>
+                <option value="atkinson">Atkinson</option>
+              </select>
+            </div>
+            <div class="field check"><label for="imageInvert"><input type="checkbox" id="imageInvert"> Инвертировать</label></div>
+            <div class="field"><label for="imageDepth">Глубина Z, мм</label><input id="imageDepth" type="number" value="-0.5" step="0.1"></div>
+            <div class="field"><label for="imageFeed">Подача, мм/мин</label><input id="imageFeed" type="number" value="800" step="50" min="1"></div>
+            <div class="field"><label for="imagePlunge">Врезание, мм/мин</label><input id="imagePlunge" type="number" value="200" step="20" min="1"></div>
+            <div class="field"><label for="imageSafeZ">Безопасная Z, мм</label><input id="imageSafeZ" type="number" value="5" step="0.5" min="0"></div>
+          </div>
+          <div class="toolbar end">
+            <button class="btn" id="imageGenerate">Сгенерировать G-код</button>
+            <button class="btn ghost" id="imageClear">Очистить</button>
+          </div>
+          <pre class="out" id="imageInfo">— загрузите PNG/JPEG —</pre>
         </div>
 
         <!-- ==================== КОНСТРУКТОР ==================== -->

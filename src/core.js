@@ -2236,6 +2236,122 @@ function solveFullCircle(sx, sy, cx, cy, dir){
   };
 }
 
+function imageToMoves(gray, srcW, srcH, opts){
+  var o = {
+    width: 50, height: 30, mode: 'dots', res: 2, lineStep: 0.5,
+    threshold: 128, dither: 'none', invert: false,
+    depth: -0.5, feed: 800, plunge: 200, safeZ: 5
+  };
+  if (opts) for (var k in opts) if (opts[k] !== undefined && opts[k] !== null) o[k] = opts[k];
+  var warnings = [];
+  var width = Math.max(1, numOr(o.width, 50));
+  var height = Math.max(1, numOr(o.height, 30));
+  var depth = numOr(o.depth, -0.5);
+  if (depth > 0) depth = -depth;
+  if (Math.abs(depth) < 0.005){ depth = -0.05; warnings.push('Глубина 0 мм — принято -0,05 мм.'); }
+  var safeZ = Math.max(0, numOr(o.safeZ, 5));
+  var feed = Math.max(1, Math.round(numOr(o.feed, 800)));
+  var plunge = Math.max(1, Math.round(numOr(o.plunge, 200)));
+  var mode = o.mode === 'lines' ? 'lines' : 'dots';
+  var res = clamp(numOr(o.res, 2), 0.2, 20);
+  var lineStep = Math.max(0.05, numOr(o.lineStep, 0.5));
+  var thr = clamp(Math.round(numOr(o.threshold, 128)), 0, 255);
+  var src = gray || [];
+  if (!(srcW > 0) || !(srcH > 0) || src.length < srcW * srcH){
+    return {moves:[], dots:0, runs:0, cells:0, gridW:0, gridH:0, width:width, height:height,
+      depth:depth, feed:feed, plunge:plunge, safeZ:safeZ, mode:mode,
+      blank:{enabled:true, w:width, h:height, thickness:5}, warnings:['Нет данных изображения.']};
+  }
+  var nx, ny;
+  if (mode === 'dots'){
+    nx = clamp(Math.round(width * res), 1, 2000);
+    ny = clamp(Math.round(height * res), 1, 2000);
+  } else {
+    nx = clamp(Math.round(width * res), 2, 4000);
+    ny = clamp(Math.ceil(height / lineStep), 1, 3000);
+  }
+  var cells = nx * ny;
+  if (cells > 250000) warnings.push('Слишком много ячеек (' + cells + ') — генерация может быть медленной.');
+  var vals = new Array(cells);
+  for (var y = 0; y < ny; y++){
+    for (var x = 0; x < nx; x++){
+      var u = (x + 0.5) / nx, v = (y + 0.5) / ny;
+      var gx = clamp(Math.floor(u * srcW), 0, srcW - 1);
+      var gy = clamp(Math.floor(v * srcH), 0, srcH - 1);
+      var val = Number(src[gy * srcW + gx]);
+      if (!isFinite(val)) val = 255;
+      if (o.invert) val = 255 - val;
+      vals[y * nx + x] = val;
+    }
+  }
+  var on = new Array(cells);
+  var dither = o.dither === 'floyd' || o.dither === 'atkinson' ? o.dither : 'none';
+  if (dither === 'none'){
+    for (var i0 = 0; i0 < cells; i0++) on[i0] = vals[i0] < thr ? 1 : 0;
+  } else {
+    var spread = dither === 'floyd'
+      ? [[1,0,7/16],[-1,1,3/16],[0,1,5/16],[1,1,1/16]]
+      : [[1,0,1/8],[2,0,1/8],[-1,1,1/8],[0,1,1/8],[1,1,1/8],[0,2,1/8]];
+    for (var dy = 0; dy < ny; dy++){
+      for (var dx = 0; dx < nx; dx++){
+        var idx = dy * nx + dx;
+        var old = vals[idx];
+        var nv = old < thr ? 0 : 255;
+        vals[idx] = nv;
+        on[idx] = nv === 0 ? 1 : 0;
+        var err = old - nv;
+        for (var si = 0; si < spread.length; si++){
+          var tx = dx + spread[si][0], ty = dy + spread[si][1];
+          if (tx < 0 || tx >= nx || ty < 0 || ty >= ny) continue;
+          vals[ty * nx + tx] = clamp(vals[ty * nx + tx] + err * spread[si][2], 0, 255);
+        }
+      }
+    }
+  }
+  var moves = [];
+  var dots = 0, runs = 0;
+  if (mode === 'dots'){
+    for (var yy = 0; yy < ny; yy++){
+      for (var xx = 0; xx < nx; xx++){
+        if (!on[yy * nx + xx]) continue;
+        var px = width * (xx + 0.5) / nx;
+        var py = height - height * (yy + 0.5) / ny;
+        moves.push({t:'rapid', x:px, y:py, z:safeZ});
+        moves.push({t:'line', x:px, y:py, z:depth, f:plunge});
+        moves.push({t:'rapid', x:px, y:py, z:safeZ});
+        dots++;
+      }
+    }
+  } else {
+    for (var ly = 0; ly < ny; ly++){
+      var py2 = height - height * (ly + 0.5) / ny;
+      var start = -1;
+      for (var lx = 0; lx <= nx; lx++){
+        var onCell = lx < nx && on[ly * nx + lx];
+        if (onCell && start < 0) start = lx;
+        if (!onCell && start >= 0){
+          var x0 = width * start / nx;
+          var x1 = width * lx / nx;
+          moves.push({t:'rapid', x:x0, y:py2, z:safeZ});
+          moves.push({t:'line', x:x0, y:py2, z:depth, f:plunge});
+          moves.push({t:'line', x:x1, y:py2, z:depth, f:feed});
+          moves.push({t:'rapid', x:x1, y:py2, z:safeZ});
+          runs++;
+          start = -1;
+        }
+      }
+    }
+  }
+  if (!moves.length) warnings.push('На изображении нечего гравировать: проверьте порог и инверсию.');
+  if (mode === 'dots' && dots > 8000) warnings.push('Очень много точек (' + dots + ') — G-код будет большим.');
+  if (mode === 'lines' && runs > 10000) warnings.push('Очень много проходов (' + runs + ') — G-код будет большим.');
+  return {
+    moves: moves, dots: dots, runs: runs, cells: cells, gridW: nx, gridH: ny,
+    width: width, height: height, depth: depth, feed: feed, plunge: plunge, safeZ: safeZ,
+    mode: mode, blank: {enabled:true, w:width, h:height, thickness:5}, warnings: warnings
+  };
+}
+
 /* --------------------------- 12. Резьба / сверление / растачивание */
 function materialOf(key){
   var mats = (typeof TABLES !== 'undefined' && TABLES.materials) ? TABLES.materials : {};
