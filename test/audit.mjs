@@ -50,11 +50,12 @@ for (const id of bodyIds){
 }
 if (tipKeys.length < 40) problem('мало подсказок: ' + tipKeys.length);
 
-/* 6. внешних ресурсов нет */
+/* 6. внешних ресурсов нет (кроме ссылки на GitHub для обратной связи) */
 if (/<script[^>]+src=/i.test(html)) problem('внешний <script src>');
 if (/<link[^>]+href=/i.test(html)) problem('внешний <link href>');
 if (/<img[^>]+src=/i.test(html)) problem('внешняя картинка');
-if (/https?:\/\/(?!www\.w3\.org)/i.test(markup)) problem('в разметке есть внешний URL');
+const externalMarkup = markup.replace(/https:\/\/github\.com\/Kozipot\/gcode-studio(?:\/issues)?/g, '');
+if (/https?:\/\/(?!www\.w3\.org)/i.test(externalMarkup)) problem('в разметке есть внешний URL');
 
 /* 7. скрипты и данные */
 const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);

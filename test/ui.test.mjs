@@ -85,6 +85,10 @@ test('скачивание доступно', () => F('download').disabled === f
 test('статистика заполнена', () => qa('#statsBox .badge').length >= 5);
 test('превью нарисовано', () => qa('#preview line, #preview polyline, #preview rect').length > 3);
 test('легенда есть', () => qa('#legend span').length >= 1);
+test('ссылка на GitHub для багов и доработок', () => {
+  const a = qa('.app-footer a').find((x) => (x.getAttribute('href') || '').includes('github.com/Kozipot/gcode-studio/issues'));
+  return !!a && a.getAttribute('target') === '_blank';
+});
 test('3D: включается', () => {
   click('#previewMode button[data-view="3d"]');
   return q('#preview3d').classList.contains('active') && q('#preview').classList.contains('hidden');
